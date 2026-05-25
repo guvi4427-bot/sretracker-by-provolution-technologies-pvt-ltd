@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description: "Start / Restart / Explore — Gamified Self-Growth Platform",
   keywords: ["SRE", "self-growth", "gamification", "learning", "fitness", "productivity"],
   authors: [{ name: "S/R/E Team" }],
-  icons: { icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg" },
+  icons: { icon: "/logo.svg" },
   openGraph: {
     title: "S/R/E — Gamified Self-Growth Platform",
     description: "Start / Restart / Explore — Your gamified journey to self-improvement",
