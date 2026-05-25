@@ -102,3 +102,29 @@ Stage Summary:
 - Admin credentials: myselfgowtham140707@gmail.com / Gowtham@123
 - 116 achievements seeded in database
 - All API routes functional and tested
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Re-deploy to Vercel production (context continuation)
+
+Work Log:
+- Verified project state: Prisma schema already using PostgreSQL provider
+- Confirmed db.ts uses standard PrismaClient (no libsql adapter)
+- Confirmed @vercel/postgres already in package.json
+- Installed Vercel CLI v54.4.1 globally
+- Verified DATABASE_URL env var already set on Vercel project
+- Verified all Neon Postgres env vars present (20 total)
+- Tested database connectivity: Prisma query returned successfully
+- Ran prisma db push — schema already in sync with database
+- Deployed to Vercel production: `vercel --prod --yes`
+- Build succeeded: 94 routes, 2m build time on iad1 region
+- Verified production endpoints:
+  - /api/health → 200 ({"status":"ok"})
+  - /login → 200
+  - / → 307 (redirect as expected)
+
+Stage Summary:
+- Production URL: https://workspace-extract.vercel.app
+- Deployment successful, all endpoints responding correctly
+- Database: Neon Postgres (already in sync)
