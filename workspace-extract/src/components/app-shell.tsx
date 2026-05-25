@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { AdCard } from '@/components/ad-banner';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useTheme } from 'next-themes';
@@ -272,8 +273,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             </motion.div>
           </AnimatePresence>
         </ErrorBoundary>
+        {/* Footer Ad Banner — visible on every page */}
+        <div className="mt-6">
+          <AdCard format="horizontal" slot="home_footer" />
+        </div>
+
         {/* Footer Links */}
-        <div className="mt-8 pt-4 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground/50">
+        <div className="mt-4 pt-4 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground/50">
           <a href="/terms" className="hover:text-muted-foreground transition-colors">Terms & Conditions</a>
           <span>·</span>
           <a href="/community-guidelines" className="hover:text-muted-foreground transition-colors">Community Guidelines</a>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Heart, MessageCircle, Repeat2, MoreHorizontal, Send, Trash2, Flag, Loader2, BookOpen, AlertTriangle, Bookmark, Rss, FileText, ChevronRight, Globe, Sparkles, Video, Edit3, ExternalLink, Film, PenTool, Check, Dumbbell, TrendingUp, Activity } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -417,6 +418,9 @@ export default function FeedPage() {
         </div>
       </GlassCard>
 
+      {/* In-Feed Ad — after post creation */}
+      <AdCard format="in-feed" slot="feed_top" />
+
       {/* Trending Groups */}
       {Object.entries(grouped).map(([tag, tagPosts]) => (
         <div key={tag}>
@@ -426,7 +430,13 @@ export default function FeedPage() {
       ))}
 
       {/* Ungrouped Posts */}
-      <div className="space-y-3">{ungrouped.map((p: any) => <PostCard key={p.id} post={p} />)}</div>
+      <div className="space-y-3">{ungrouped.map((p: any, i: number) => (
+        <React.Fragment key={p.id}>
+          <PostCard post={p} />
+          {/* Show in-feed ad after every 4th post */}
+          {(i + 1) % 4 === 0 && i < ungrouped.length - 1 && <AdCard format="in-feed" slot="feed_mid" />}
+        </React.Fragment>
+      ))}</div>
 
       {posts.length === 0 && !loading && (
         <GlassCard className="p-8 text-center">

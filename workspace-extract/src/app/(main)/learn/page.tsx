@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { BookOpen, Plus, Trash2, Sparkles, Send, Bot, Loader2, Globe, Lock, Eye, Share2, X, Users, ChevronRight, Clock, Calendar, MessageCircle, Search } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { SelectPill } from '@/components/select-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -258,6 +259,8 @@ function LearnPageContent() {
           </div>
           <Button onClick={checkProgress} variant="ghost" className="text-purple-400 border border-purple-500/20"><Sparkles size={14} className="mr-1" />{t('learning.aiProgressCheck')}</Button>
           {aiProgress && <GlassCard className="p-4"><p className={`text-sm ${aiProgress.shouldWarn ? 'text-amber-400' : 'text-green-400'}`}>{aiProgress.message}</p></GlassCard>}
+          {/* Ad after overview stats */}
+          <AdCard format="horizontal" slot="learn_overview" />
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-4 mt-4">

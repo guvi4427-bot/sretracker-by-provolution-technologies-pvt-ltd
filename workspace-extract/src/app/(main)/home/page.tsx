@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Zap, BookOpen, Dumbbell, PenTool, Clock, Trophy, Flame, Star, Target, Award, BarChart3, ChevronRight } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { XPBar } from '@/components/xp-bar';
 import { StreakBadge } from '@/components/streak-badge';
 import { useUserStore } from '@/stores/user-store';
@@ -121,6 +122,9 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Ad Banner — between stats and daily quests */}
+      <AdCard format="horizontal" slot="home_mid" />
 
       {(quests.length > 0 || true) && (
         <div>

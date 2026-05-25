@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Dumbbell, Plus, Trash2, Sparkles, Send, Bot, Loader2, Target, Flame, Utensils, Scale, Activity, Edit, Save, X, TrendingUp, ChevronLeft, ChevronDown, Video } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { MacroBar } from '@/components/macro-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
