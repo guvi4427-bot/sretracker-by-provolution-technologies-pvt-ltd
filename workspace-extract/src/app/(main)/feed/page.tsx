@@ -418,9 +418,6 @@ export default function FeedPage() {
         </div>
       </GlassCard>
 
-      {/* In-Feed Ad — after post creation */}
-      <AdCard format="in-feed" slot="feed_top" />
-
       {/* Trending Groups */}
       {Object.entries(grouped).map(([tag, tagPosts]) => (
         <div key={tag}>
@@ -605,6 +602,9 @@ export default function FeedPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="feed_top" />
 
       {/* Report Dialog */}
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
