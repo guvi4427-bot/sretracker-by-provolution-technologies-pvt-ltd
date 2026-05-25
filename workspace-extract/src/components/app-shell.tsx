@@ -204,7 +204,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-          <Zap className="w-8 h-8 text-blue-400" />
+          <img src="/logo.png" alt="S/R/E" className="w-8 h-8 rounded-lg" />
         </motion.div>
       </div>
     );
@@ -215,7 +215,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-          <Zap className="w-8 h-8 text-blue-400" />
+          <img src="/logo.png" alt="S/R/E" className="w-8 h-8 rounded-lg" />
         </motion.div>
       </div>
     );
@@ -244,7 +244,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       {/* Top Header */}
       <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 glass-glowing">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg gradient-blue flex items-center justify-center"><Zap className="w-3.5 h-3.5 text-white" /></div>
+          <img src="/logo.png" alt="S/R/E" className="w-7 h-7 rounded-lg object-cover" />
           <span className="font-bold text-foreground text-sm">S/R/E</span>
         </div>
         <div className="flex items-center gap-3">

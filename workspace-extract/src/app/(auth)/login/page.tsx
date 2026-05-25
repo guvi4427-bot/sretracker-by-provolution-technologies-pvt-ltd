@@ -81,9 +81,9 @@ export default function LoginPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center mb-4 glow-blue"
+            className="w-16 h-16 rounded-2xl mb-4 glow-blue overflow-hidden"
           >
-            <Zap className="w-8 h-8 text-white" />
+            <img src="/logo.png" alt="S/R/E" className="w-full h-full object-cover" />
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">{t('app.name')}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('app.tagline')}</p>

@@ -8,9 +8,7 @@ export default function TermsPage() {
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-12">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="S/R/E" className="w-10 h-10 rounded-xl object-cover" />
           <h1 className="text-2xl font-bold text-foreground">Terms &amp; Conditions</h1>
         </div>
 
