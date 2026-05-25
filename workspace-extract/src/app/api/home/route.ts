@@ -120,6 +120,11 @@ export async function GET() {
 
     const focusMinutes = focusSessions._sum.duration || 0;
 
+    // Achievement count (unlocked by user)
+    const achievementCount = await db.userAchievement.count({
+      where: { userId },
+    });
+
     // Leaderboard top 5
     const topProfiles = await db.profile.findMany({
       where: {
@@ -161,6 +166,7 @@ export async function GET() {
       recentActivity,
       activePhases,
       quickStats: { learningEntries, workouts, focusMinutes, meals },
+      achievementCount,
       leaderboard,
       streakInfo: {
         currentStreak: profile?.currentStreak || 0,
