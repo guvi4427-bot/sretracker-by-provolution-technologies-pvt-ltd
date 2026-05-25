@@ -13,7 +13,7 @@ import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['posts', 'liveupdates', 'topics', 'groups', 'users'];
+const TABS = ['posts', 'topics', 'groups', 'users'];
 
 // Live status pipeline per content type (shared with feed page)
 const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color: string; icon: any }[]> = {
@@ -67,13 +67,19 @@ export default function DiscoverPage() {
   const { profile } = useUserStore();
   const [activeTab, setActiveTab] = useState('posts');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>({ posts: [], liveupdates: [], topics: [], groups: [], users: [] });
+  const [results, setResults] = useState<any>({ posts: [], topics: [], groups: [], users: [] });
   const [loading, setLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState<string|null>(null);
 
+  // Live updates state — auto-fetched on page load
+  const [liveContentUpdates, setLiveContentUpdates] = useState<any[]>([]);
+  const [liveFitnessUpdates, setLiveFitnessUpdates] = useState<any[]>([]);
+  const [liveWeightUpdates, setLiveWeightUpdates] = useState<any[]>([]);
+  const [liveLoading, setLiveLoading] = useState(true);
+
   const search = useCallback(async (type?: string) => {
     const tab = type || activeTab;
-    if (!query.trim() && tab !== 'groups' && tab !== 'topics' && tab !== 'liveupdates') { setResults({ posts: [], liveupdates: [], topics: [], groups: [], users: [] }); return; }
+    if (!query.trim() && tab !== 'groups' && tab !== 'topics') { setResults({ posts: [], topics: [], groups: [], users: [] }); return; }
     setLoading(true);
     try {
       const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(query.toLowerCase())}`);
@@ -85,19 +91,36 @@ export default function DiscoverPage() {
     } catch {} finally { setLoading(false); }
   }, [query, activeTab]);
 
-  useEffect(() => { if (activeTab === 'groups' || activeTab === 'topics' || activeTab === 'liveupdates' || query.trim()) search(); }, [activeTab, search]);
+  // Auto-fetch live updates on page load
+  const fetchLiveUpdates = useCallback(async () => {
+    try {
+      const r = await fetch('/api/feed/live-updates');
+      if (r.ok) {
+        const d = await r.json();
+        setLiveContentUpdates(d.contentUpdates || []);
+        setLiveFitnessUpdates(d.fitnessUpdates || []);
+        setLiveWeightUpdates(d.weightUpdates || []);
+      }
+    } catch {} finally { setLiveLoading(false); }
+  }, []);
 
-  // Handle URL query param — also auto-switch to liveupdates tab for hashtag searches
+  useEffect(() => { fetchLiveUpdates(); }, [fetchLiveUpdates]);
+
+  // Listen for xp-updated events to refresh live data
+  useEffect(() => {
+    const handler = () => { fetchLiveUpdates(); };
+    window.addEventListener('xp-updated', handler);
+    return () => { window.removeEventListener('xp-updated', handler); };
+  }, [fetchLiveUpdates]);
+
+  useEffect(() => { if (activeTab === 'groups' || activeTab === 'topics' || query.trim()) search(); }, [activeTab, search]);
+
+  // Handle URL query param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q');
     if (q) {
       setQuery(q);
-      // Auto-switch to liveupdates for specific hashtags
-      const cleanQ = q.replace(/^#/, '').toLowerCase();
-      if (['content', 'progress', 'fitness', 'gains', 'shredding'].includes(cleanQ)) {
-        setActiveTab('liveupdates');
-      }
     }
   }, []);
 
@@ -350,6 +373,14 @@ export default function DiscoverPage() {
     );
   }
 
+  // Build merged & sorted live updates
+  const allLiveUpdates = [...liveContentUpdates, ...liveFitnessUpdates, ...liveWeightUpdates]
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+
+  // Group live updates for sectioned display
+  const contentLive = liveContentUpdates;
+  const fitnessLive = [...liveFitnessUpdates, ...liveWeightUpdates];
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Search */}
@@ -360,11 +391,63 @@ export default function DiscoverPage() {
         </div>
       </GlassCard>
 
+      {/* ═══ LIVE UPDATES SECTION — always visible at top, rich cards ═══ */}
+      {!liveLoading && allLiveUpdates.length > 0 && (
+        <div className="space-y-3">
+          {/* Content Live Updates */}
+          {contentLive.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Video size={14} className="text-purple-400" />
+                <h3 className="text-sm font-medium text-purple-400">#content</h3>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                <span className="text-[9px] text-muted-foreground/50 ml-1">{contentLive.length} update{contentLive.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-3">
+                {contentLive.map((u: any) => (
+                  <DiscoverContentCard key={u.id} update={u} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fitness Live Updates */}
+          {fitnessLive.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Dumbbell size={14} className="text-green-400" />
+                <h3 className="text-sm font-medium text-green-400">#fitness</h3>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                <span className="text-[9px] text-muted-foreground/50 ml-1">{fitnessLive.length} update{fitnessLive.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-3">
+                {fitnessLive.map((u: any) => (
+                  <DiscoverFitnessCard key={u.id} update={u} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Live loading skeleton */}
+      {liveLoading && (
+        <GlassCard className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity size={14} className="text-green-400" />
+            <span className="text-sm text-muted-foreground">Loading live updates...</span>
+            <Loader2 size={14} className="text-green-400 animate-spin ml-1" />
+          </div>
+        </GlassCard>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-accent border border-border w-full flex">
           {TABS.map(tab => (
-            <TabsTrigger key={tab} value={tab} className={`text-muted-foreground text-xs flex-1 ${tab === 'liveupdates' ? 'data-[state=active]:text-green-400 data-[state=active]:bg-green-600/20' : 'data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20'}`}>
-              {tab === 'liveupdates' ? <><Activity size={14} className="mr-1" />Live</> : t(`discover.${tab}`)}
+            <TabsTrigger key={tab} value={tab} className="text-muted-foreground text-xs flex-1 data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20">
+              {t(`discover.${tab}`)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -380,22 +463,6 @@ export default function DiscoverPage() {
               <p className="text-sm text-foreground/90 whitespace-pre-wrap">{renderContent(p.content)}</p>
             </GlassCard>
           ))}
-        </TabsContent>
-
-        {/* ═══ LIVE UPDATES TAB ═══ */}
-        <TabsContent value="liveupdates" className="space-y-3 mt-4">
-          {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-green-400 animate-spin" /></div> :
-          (Array.isArray(results.liveupdates) ? results.liveupdates : []).length === 0 ? (
-            <GlassCard className="p-8 text-center">
-              <Activity className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No live updates found</p>
-              <p className="text-xs text-muted-foreground/50 mt-1">Try searching #content, #fitness, #gains, or #shredding</p>
-            </GlassCard>
-          ) : (
-            (Array.isArray(results.liveupdates) ? results.liveupdates : []).map((u: any) => (
-              u.type === 'content_update' ? <DiscoverContentCard key={u.id} update={u} /> : <DiscoverFitnessCard key={u.id} update={u} />
-            ))
-          )}
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-3 mt-4">
