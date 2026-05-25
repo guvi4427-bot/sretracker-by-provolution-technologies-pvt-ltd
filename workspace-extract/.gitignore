@@ -42,3 +42,4 @@ deploy-*.log
 .last-deploy-url
 logs/
 db/custom.db
+.env*
