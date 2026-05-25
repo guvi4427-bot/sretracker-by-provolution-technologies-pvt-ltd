@@ -88,7 +88,11 @@ export async function PATCH(request: Request) {
     if (shareContentStatus !== undefined) profileData.shareContentStatus = shareContentStatus;
 
     if (Object.keys(profileData).length > 0) {
-      await db.profile.update({ where: { userId: session.user.id }, data: profileData });
+      await db.profile.upsert({
+        where: { userId: session.user.id },
+        update: profileData,
+        create: { userId: session.user.id, ...profileData },
+      });
     }
 
     if (phone !== undefined) {

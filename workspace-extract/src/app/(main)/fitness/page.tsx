@@ -611,7 +611,7 @@ export default function FitnessPage() {
             <GlassCard variant="liquid" className="p-3 text-center"><p className="text-lg font-bold text-red-400">{totalBurned.toFixed(0)}</p><p className="text-[10px] text-muted-foreground/70">{t('fitness.burned')}</p></GlassCard>
             <GlassCard variant="liquid" className="p-3 text-center"><p className="text-lg font-bold text-emerald-400">{((currentRequiredCal || 0) - totalMacros.calories + totalBurned).toFixed(0)}</p><p className="text-[10px] text-muted-foreground/70">{t('fitness.remaining')}</p></GlassCard>
           </div>
-          {totalMacros.calories > 0 && currentMacros && <MacroBar protein={totalMacros.proteinG} carbs={totalMacros.carbsG} fat={totalMacros.fatG} fiber={totalMacros.fiberG} proteinGoal={currentMacros.proteinG} carbsGoal={currentMacros.carbsG} fatGoal={currentMacros.fatG} fiberGoal={currentMacros.fiberG} />}
+          {totalMacros.calories > 0 && currentMacros && <MacroBar protein={Math.round(totalMacros.proteinG * 100) / 100} carbs={Math.round(totalMacros.carbsG * 100) / 100} fat={Math.round(totalMacros.fatG * 100) / 100} fiber={Math.round(totalMacros.fiberG * 100) / 100} proteinGoal={currentMacros.proteinG} carbsGoal={currentMacros.carbsG} fatGoal={currentMacros.fatG} fiberGoal={currentMacros.fiberG} />}
           {currentMacros && (
             <GlassCard className="p-3">
               <p className="text-xs text-muted-foreground mb-2">Daily Macro Targets</p>
@@ -638,7 +638,7 @@ export default function FitnessPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-amber-400 font-medium">{weeklyAvg.calories.toFixed(0)} cal/day</span>
-                  <span className="text-[10px] text-muted-foreground">P:{weeklyAvg.proteinG.toFixed(0)}g C:{weeklyAvg.carbsG.toFixed(0)}g F:{weeklyAvg.fatG.toFixed(0)}g</span>
+                  <span className="text-[10px] text-muted-foreground">P:{weeklyAvg.proteinG.toFixed(2)}g C:{weeklyAvg.carbsG.toFixed(2)}g F:{weeklyAvg.fatG.toFixed(2)}g</span>
                   <motion.div animate={{ rotate: weeklyMacroExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                     <ChevronDown size={15} className="text-muted-foreground/50" />
                   </motion.div>
@@ -664,7 +664,7 @@ export default function FitnessPage() {
                             {day.hasData ? (
                               <div className="flex items-center gap-3">
                                 <span className="text-xs text-amber-400">{day.calories.toFixed(0)} cal</span>
-                                <span className="text-[10px] text-muted-foreground">P:{day.proteinG.toFixed(0)}g C:{day.carbsG.toFixed(0)}g F:{day.fatG.toFixed(0)}g</span>
+                                <span className="text-[10px] text-muted-foreground">P:{day.proteinG.toFixed(2)}g C:{day.carbsG.toFixed(2)}g F:{day.fatG.toFixed(2)}g</span>
                               </div>
                             ) : (
                               <span className="text-[10px] text-muted-foreground/40 italic">No meals logged</span>

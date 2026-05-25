@@ -119,7 +119,8 @@ export default function ProfilePage() {
         body: JSON.stringify({ name: editName, bio: editBio, phone: editPhone || null }),
       });
       if (r.ok) { setEditing(false); fetchProfile(); toast.success(t('common.success')); }
-    } catch {}
+      else { const d = await r.json().catch(() => ({})); toast.error(d.error || 'Failed to save profile'); }
+    } catch { toast.error('Network error. Please try again.'); }
   }
 
   async function toggleShareAchievements(val: boolean) {

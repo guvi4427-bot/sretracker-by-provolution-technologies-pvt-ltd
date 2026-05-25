@@ -26,15 +26,17 @@ interface SingleMacroProps {
 
 function SingleMacro({ label, value, goal, color, unit = 'g' }: SingleMacroProps) {
   const progress = goal > 0 ? Math.min(value / goal, 1) : 0;
+  const displayValue = Math.round(value * 100) / 100;
+  const displayGoal = Math.round(goal * 100) / 100;
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
         <span className="text-white/60">{label}</span>
         <span className="tabular-nums text-white/80">
-          {value}
+          {displayValue}
           {unit}
-          <span className="text-white/30"> / {goal}{unit}</span>
+          <span className="text-white/30"> / {displayGoal}{unit}</span>
         </span>
       </div>
       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
