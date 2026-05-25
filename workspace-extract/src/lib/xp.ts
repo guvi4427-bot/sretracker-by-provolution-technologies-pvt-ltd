@@ -50,13 +50,12 @@ export async function awardXP(userId: string, category: keyof typeof XP_REWARDS,
   });
   
   // After transaction completes, check for newly eligible achievements.
-  // AWAITED so the notification is created before the API returns to the frontend.
-  // This ensures the bell icon refresh (triggered by xp-updated event) finds the new notification.
-  try {
-    await checkAndNotifyEligibleAchievements(userId);
-  } catch (e) {
-    console.error('Achievement check error (non-blocking):', e);
-  }
+  // Fire-and-forget: run in background so the API returns instantly.
+  // The frontend polls notification count rapidly after xp-updated events,
+  // so achievement notifications appear within ~1-2 seconds.
+  checkAndNotifyEligibleAchievements(userId).catch((e) => {
+    console.error('Achievement check error (background):', e);
+  });
   
   return result;
 }

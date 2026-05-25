@@ -77,6 +77,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  // Burst-poll notification count: rapid checks right after an XP event
+  // to catch achievement notifications that arrive asynchronously
+  const burstPollNotifications = useCallback(() => {
+    const delays = [300, 800, 1500, 2500];
+    delays.forEach(ms => {
+      setTimeout(() => { refreshNotificationCount(); }, ms);
+    });
+  }, [refreshNotificationCount]);
+
   useEffect(() => {
     if (sessionStatus === 'authenticated') {
       fetchProfile();
@@ -86,11 +95,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       }).catch(() => {});
       // Fetch unread notification count immediately
       refreshNotificationCount();
-      // Periodic refresh as fallback (every 10s)
+      // Periodic refresh every 5 seconds (fast enough for near-real-time feel)
       refreshIntervalRef.current = setInterval(() => {
         fetchProfile();
         refreshNotificationCount();
-      }, 10000);
+      }, 5000);
       return () => { if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current); };
     } else if (sessionStatus === 'unauthenticated') {
       router.push('/login');
@@ -103,27 +112,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       refreshNotificationCount();
     }
     function handleXpUpdated() {
-      // Call check-eligible and wait for it to complete before refreshing
-      // the notification count. This prevents the race condition where
-      // refreshNotificationCount reads the DB before the write completes.
-      fetch('/api/achievements/check-eligible', { method: 'POST' })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data && data.newNotifications > 0) {
-            toast.success('🏆 Achievement ready to claim!', {
-              description: 'Go to achievements to claim it'
-            });
-          }
-          // Refresh ONLY after check-eligible confirms completion
-          refreshNotificationCount();
-        })
-        .catch(() => {
-          // On error still refresh so the bell is not stale
-          refreshNotificationCount();
-        });
-      // Single delayed fallback for edge cases where check-eligible
-      // is slow or the notification was already created by awardXP
-      setTimeout(() => { refreshNotificationCount(); }, 2000);
+      // Immediately refresh profile + notification count, then burst-poll
+      // to catch achievement notifications that arrive asynchronously.
+      // No redundant check-eligible call — the server already runs it
+      // in the background when awardXP() fires.
+      fetchProfile();
+      refreshNotificationCount();
+      burstPollNotifications();
     }
     window.addEventListener('xp-updated', handleXpUpdated);
     window.addEventListener('notification-updated', handleNotificationRefresh);
@@ -131,22 +126,19 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       window.removeEventListener('xp-updated', handleXpUpdated);
       window.removeEventListener('notification-updated', handleNotificationRefresh);
     };
-  }, [refreshNotificationCount]);
+  }, [refreshNotificationCount, burstPollNotifications, fetchProfile]);
 
   // Refresh notification count when tab becomes visible (catches up after tab switch)
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         refreshNotificationCount();
-        // Also check for any missed achievement notifications
-        fetch('/api/achievements/check-eligible', { method: 'POST' }).then(() => {
-          refreshNotificationCount();
-        }).catch(() => {});
+        fetchProfile();
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => { document.removeEventListener('visibilitychange', handleVisibilityChange); };
-  }, [refreshNotificationCount]);
+  }, [refreshNotificationCount, fetchProfile]);
 
   useEffect(() => {
     if (profile && prevXpRef.current > 0 && profile.xp > prevXpRef.current) {
