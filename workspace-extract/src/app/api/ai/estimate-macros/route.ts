@@ -62,11 +62,22 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
   if (u === 'ml') return quantity; // 1ml ≈ 1g for water-based foods
   if (u === 'mg') return quantity * 0.001; // milligrams to grams
 
-  // ── Step 1: Check supplement-specific unit conversions ──
-  const supplementLookupKeys = [
-    `${foodKey}:${u}`,
-    `${foodKey.split(' ')[0]}:${u}`,
-  ];
+  // ── Step 1: Check brand+variant specific unit conversions (highest priority) ──
+  // Generate comprehensive lookup keys from the food name to match brand+variant entries
+  const words = foodKey.split(/\s+/).filter(w => w.length > 0);
+  const supplementLookupKeys: string[] = [];
+
+  // Full name match
+  supplementLookupKeys.push(`${foodKey}:${u}`);
+
+  // Brand name + partial variant matches (e.g., "nakpro impact whey blend:scoop")
+  // Try progressively shorter prefixes
+  for (let i = Math.min(words.length, 5); i >= 2; i--) {
+    supplementLookupKeys.push(`${words.slice(0, i).join(' ')}:${u}`);
+  }
+
+  // First word (brand) + unit
+  supplementLookupKeys.push(`${words[0]}:${u}`);
 
   for (const key of supplementLookupKeys) {
     if (SUPPLEMENT_UNIT_TO_GRAMS[key]) {
@@ -75,15 +86,30 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
   }
 
   // ── Step 2: Check if the food name matches a supplement entry with servingSize ──
-  // This handles brand-specific serving sizes (e.g., "MuscleBlaze Whey" scoop = 33g)
+  // This handles brand-specific serving sizes (e.g., "MuscleBlaze Whey" scoop = 36g)
   const supplementMatch = findSupplementInDatabase(foodKey);
   if (supplementMatch && supplementMatch.servingSize) {
     // If the user's unit matches the supplement's default serving unit, use its serving size
     const supUnit = supplementMatch.servingUnit || 'serving';
-    if (u === supUnit || (u === 'scoop' && supUnit === 'scoop') || (u === 'serving' && supUnit === 'serving') || (u === 'bar' && supUnit === 'bar') || (u === 'capsule' && (supUnit === 'capsule' || supUnit === 'softgel')) || (u === 'tablet' && supUnit === 'tablet') || (u === 'softgel' && (supUnit === 'softgel' || supUnit === 'capsule')) || (u === 'gummy' && supUnit === 'gummy') || (u === 'sachet' && (supUnit === 'sachet' || supUnit === 'packet')) || (u === 'packet' && (supUnit === 'packet' || supUnit === 'sachet')) || (u === 'ml' && supUnit === 'ml')) {
+    const unitMatches = (
+      u === supUnit ||
+      (u === 'scoop' && supUnit === 'scoop') ||
+      (u === 'serving' && (supUnit === 'serving' || supUnit === 'scoop')) ||
+      (u === 'bar' && supUnit === 'bar') ||
+      (u === 'capsule' && (supUnit === 'capsule' || supUnit === 'softgel')) ||
+      (u === 'tablet' && supUnit === 'tablet') ||
+      (u === 'softgel' && (supUnit === 'softgel' || supUnit === 'capsule')) ||
+      (u === 'gummy' && supUnit === 'gummy') ||
+      (u === 'sachet' && (supUnit === 'sachet' || supUnit === 'packet')) ||
+      (u === 'packet' && (supUnit === 'packet' || supUnit === 'sachet')) ||
+      (u === 'ml' && supUnit === 'ml')
+    );
+    if (unitMatches) {
       return quantity * supplementMatch.servingSize;
     }
-    // For scoop/serving on supplements, use the supplement's serving size
+    // For scoop/serving on supplements, always use the supplement's serving size
+    // This is the KEY change: when user enters brand+variant and selects "serving",
+    // we use the brand-specific serving size, not the generic default
     if ((u === 'scoop' || u === 'serving') && supplementMatch.servingSize) {
       return quantity * supplementMatch.servingSize;
     }
@@ -301,11 +327,17 @@ export async function POST(req: Request) {
           : '';
 
         // Detect if this is likely a supplement query
-        const supplementKeywords = ['whey', 'protein powder', 'creatine', 'bcaa', 'eaa', 'pre-workout', 'preworkout', 'mass gainer', 'fat burner', 'multivitamin', 'omega-3', 'fish oil', 'casein', 'isolate', 'glutamine', 'citrulline', 'beta-alanine', 'collagen', 'ashwagandha', 'shilajit', 'magnesium', 'zinc', 'vitamin', 'capsule', 'tablet', 'bar', 'scoop', 'gummy', 'softgel', 'mb', 'on', 'optimum', 'muscleblaze', 'myprotein', 'gnc', 'dymatize', 'bsn', 'muscletech', 'cellucor', 'ghost', 'isopure', 'quest', 'naked', 'orgain', 'vega', 'garden of life', 'nakpro', 'as-it-is', 'asitis', 'healthkart', 'nutrabay', 'fast&up', 'big muscles', 'six pack', 'labrada', 'herbalife', 'ensure', 'boost', 'horlicks', 'bournvita', 'complan', 'protinex', 'amway', 'huel', 'soylent'];
+        const supplementKeywords = ['whey', 'protein powder', 'creatine', 'bcaa', 'eaa', 'pre-workout', 'preworkout', 'mass gainer', 'fat burner', 'multivitamin', 'omega-3', 'fish oil', 'casein', 'isolate', 'glutamine', 'citrulline', 'beta-alanine', 'collagen', 'ashwagandha', 'shilajit', 'magnesium', 'zinc', 'vitamin', 'capsule', 'tablet', 'bar', 'scoop', 'gummy', 'softgel', 'mb', 'on', 'optimum', 'muscleblaze', 'myprotein', 'gnc', 'dymatize', 'bsn', 'muscletech', 'cellucor', 'ghost', 'isopure', 'quest', 'naked', 'orgain', 'vega', 'garden of life', 'nakpro', 'as-it-is', 'asitis', 'healthkart', 'nutrabay', 'fast&up', 'big muscles', 'six pack', 'labrada', 'herbalife', 'ensure', 'boost', 'horlicks', 'bournvita', 'complan', 'protinex', 'amway', 'huel', 'soylent', 'osoaa', 'avvatar', 'scitron', 'bigflex', 'naturaltein', 'wellcore', 'xlr8', 'fuel one', 'biozyme', 'nitro-tech', 'hydrowhey', 'creapure', 'impact whey', 'rule one', 'r1 protein', 'atom whey'];
         const isSupplementQuery = supplementKeywords.some(kw => searchKey.includes(kw));
 
+        // If we found a supplement match in the DB, include its exact serving size in the AI context
+        const supplementMatchForContext = findSupplementInDatabase(searchKey);
+        const servingContext = supplementMatchForContext?.servingSize
+          ? `\n- The database shows this product has a serving size of ${supplementMatchForContext.servingSize}g per ${supplementMatchForContext.servingUnit || 'serving'} with per-100g macros: ${supplementMatchForContext.protein}g protein, ${supplementMatchForContext.carbs}g carbs, ${supplementMatchForContext.fat}g fat, ${supplementMatchForContext.calories} calories`
+          : '';
+
         const supplementContext = isSupplementQuery
-          ? `\n\nIMPORTANT: This appears to be a dietary supplement query. Consider:\n- Protein powders (whey, casein, soy, pea, etc.) are typically measured per scoop (25-35g) or per serving\n- Creatine monohydrate is 0 calories, taken as 5g per serving\n- BCAA/EAA powders are nearly calorie-free amino acid blends (~5-10g per serving)\n- Pre-workouts are typically 5-15 calories per serving (6-14g)\n- Vitamins/minerals in capsule/tablet form are negligible calories (1-5 cal each)\n- Protein bars are typically 180-250 cal per bar (50-65g each)\n- Fat burners are typically negligible calories per capsule\n- RTD protein shakes are typically 100-160 cal per 300-350ml bottle\n- Mass gainers are typically 600-1200 cal per serving (100-150g powder)\n- Always calculate for the EXACT quantity and unit specified by the user\n- Brand-specific products may have different macro profiles than generic versions`
+          ? `\n\nIMPORTANT: This appears to be a dietary supplement query. Consider:\n- Protein powders (whey, casein, soy, pea, etc.) are typically measured per scoop (25-35g) or per serving\n- BRAND-SPECIFIC serving sizes vary: ON Gold Standard = 31g, MyProtein Impact Whey = 25g, MuscleBlaze Biozyme = 36g, Dymatize ISO 100 = 30g, Nakpro Impact Whey Blend = 48g, MuscleTech Nitro-Tech = 46g, ON Serious Mass = 334g\n- Creatine monohydrate is 0 calories, typically 3-5g per serving\n- BCAA/EAA powders are nearly calorie-free amino acid blends (~5-10g per serving)\n- Pre-workouts are typically 5-15 calories per serving (6-15g)\n- Vitamins/minerals in capsule/tablet form are negligible calories (1-5 cal each)\n- Protein bars are typically 180-250 cal per bar (50-65g each)\n- Fat burners are typically negligible calories per capsule\n- Mass gainers are typically 600-1250 cal per serving (100-334g powder)\n- Always calculate for the EXACT quantity and unit specified by the user\n- Brand-specific products have different macro profiles and serving sizes than generic versions\n- The gram weight (~${Math.round(grams)}g) was calculated using the brand-specific serving size when available${servingContext}`
           : '';
 
         const aiPrompt = `Estimate nutritional macros for: "${mealName}", quantity: ${quantityNum} ${userUnit} (~${Math.round(grams)}g).
