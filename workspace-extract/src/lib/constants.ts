@@ -42,9 +42,9 @@ export const FOOD_DATABASE = [
   { name: "Naan", calories: 280, protein: 8.0, carbs: 44, fat: 7.5, fiber: 2.5 },
   { name: "Puri", calories: 340, protein: 6.0, carbs: 40, fat: 17, fiber: 2.0 },
   { name: "Dosa", calories: 170, protein: 4.0, carbs: 26, fat: 5.5, fiber: 1.5 },              // plain
-  { name: "Idli", calories: 130, protein: 3.5, carbs: 25, fat: 0.5, fiber: 1.0 },
+  { name: "Idli", calories: 112, protein: 3.2, carbs: 24.5, fat: 0.2, fiber: 1.0 },           // steamed (PDF verified)
   { name: "Upma", calories: 150, protein: 3.5, carbs: 22, fat: 5.5, fiber: 1.5 },
-  { name: "Poha", calories: 155, protein: 3.0, carbs: 27, fat: 4.5, fiber: 1.0 },              // flattened rice
+  { name: "Poha", calories: 180, protein: 3.0, carbs: 32, fat: 4.5, fiber: 1.0 },              // flattened rice (PDF verified)
   { name: "Pasta", calories: 131, protein: 5.0, carbs: 25, fat: 1.1, fiber: 1.8 },             // cooked
   { name: "Bread", calories: 265, protein: 9.0, carbs: 49, fat: 3.2, fiber: 2.7 },             // white
   { name: "Whole Wheat Bread", calories: 247, protein: 13, carbs: 41, fat: 3.4, fiber: 7.0 },
@@ -64,7 +64,7 @@ export const FOOD_DATABASE = [
   { name: "Chicken Thigh", calories: 209, protein: 26, carbs: 0, fat: 10.9, fiber: 0 },
   { name: "Chicken Curry", calories: 145, protein: 14, carbs: 5, fat: 7.5, fiber: 1.0 },
   { name: "Tandoori Chicken", calories: 165, protein: 27, carbs: 2, fat: 5.5, fiber: 0.5 },
-  { name: "Butter Chicken", calories: 180, protein: 16, carbs: 6, fat: 10, fiber: 0.8 },
+  { name: "Butter Chicken", calories: 245, protein: 14.5, carbs: 4.5, fat: 19, fiber: 0.8 },   // (PDF verified)
   { name: "Fish Curry", calories: 120, protein: 15, carbs: 5, fat: 4.5, fiber: 0.8 },
   { name: "Salmon", calories: 208, protein: 20, carbs: 0, fat: 13, fiber: 0 },
   { name: "Tuna", calories: 132, protein: 28, carbs: 0, fat: 1.3, fiber: 0 },                  // fresh
@@ -80,11 +80,11 @@ export const FOOD_DATABASE = [
   { name: "Dal", calories: 120, protein: 8, carbs: 18, fat: 2.5, fiber: 5.0 },                  // generic cooked dal
   { name: "Dal Tadka", calories: 130, protein: 7.5, carbs: 17, fat: 4.0, fiber: 4.5 },          // tempered
   { name: "Toor Dal", calories: 120, protein: 8.0, carbs: 18, fat: 2.0, fiber: 5.5 },           // cooked
-  { name: "Moong Dal", calories: 110, protein: 7.5, carbs: 17, fat: 1.5, fiber: 4.5 },          // cooked
-  { name: "Masoor Dal", calories: 115, protein: 8.5, carbs: 18, fat: 1.8, fiber: 5.0 },         // red lentil, cooked
-  { name: "Chana Dal", calories: 125, protein: 8.5, carbs: 19, fat: 2.2, fiber: 6.0 },          // cooked
+  { name: "Moong Dal", calories: 105, protein: 7.0, carbs: 19, fat: 0.3, fiber: 4.5 },          // cooked (PDF verified)
+  { name: "Masoor Dal", calories: 116, protein: 9.0, carbs: 20, fat: 0.4, fiber: 5.0 },         // red lentil, cooked (PDF verified)
+  { name: "Chana Dal", calories: 164, protein: 8.9, carbs: 27, fat: 2.6, fiber: 6.0 },          // cooked (PDF verified)
   { name: "Urad Dal", calories: 120, protein: 9.0, carbs: 17, fat: 2.0, fiber: 5.0 },           // cooked
-  { name: "Rajma", calories: 130, protein: 8.5, carbs: 22, fat: 0.8, fiber: 6.5 },              // kidney beans, cooked
+  { name: "Rajma", calories: 140, protein: 9.0, carbs: 25, fat: 0.6, fiber: 6.5 },              // kidney beans, cooked (PDF verified)
   { name: "Chole", calories: 140, protein: 8.5, carbs: 23, fat: 3.0, fiber: 6.5 },              // chickpea curry
   { name: "Chickpeas", calories: 164, protein: 8.9, carbs: 27, fat: 2.6, fiber: 7.6 },          // cooked
   { name: "Lentils", calories: 116, protein: 9.0, carbs: 20, fat: 0.4, fiber: 7.9 },            // cooked
@@ -102,7 +102,7 @@ export const FOOD_DATABASE = [
   { name: "Aloo Matar", calories: 100, protein: 3.0, carbs: 14, fat: 3.5, fiber: 2.5 },
   { name: "Bhindi Masala", calories: 90, protein: 2.5, carbs: 8, fat: 6.0, fiber: 3.0 },        // okra
   { name: "Baingan Bharta", calories: 75, protein: 2.0, carbs: 7, fat: 4.5, fiber: 2.5 },       // smoked eggplant
-  { name: "Palak Paneer", calories: 130, protein: 8.0, carbs: 5, fat: 9.0, fiber: 2.5 },
+  { name: "Palak Paneer", calories: 160, protein: 9.0, carbs: 5.0, fat: 12.0, fiber: 2.5 },   // (PDF verified)
   { name: "Mixed Veg Curry", calories: 85, protein: 2.5, carbs: 10, fat: 4.0, fiber: 2.5 },
   { name: "Cauliflower", calories: 25, protein: 1.9, carbs: 5, fat: 0.3, fiber: 2.0 },
   { name: "Cabbage", calories: 25, protein: 1.3, carbs: 5.8, fat: 0.1, fiber: 2.5 },
@@ -118,7 +118,7 @@ export const FOOD_DATABASE = [
 
   // ─── Paneer & Dairy ───
   { name: "Paneer", calories: 265, protein: 18.3, carbs: 1.2, fat: 20.8, fiber: 0 },            // raw
-  { name: "Paneer Butter Masala", calories: 210, protein: 10, carbs: 8, fat: 15, fiber: 1.0 },
+  { name: "Paneer Butter Masala", calories: 225, protein: 8.5, carbs: 6.5, fat: 18.5, fiber: 1.0 }, // (PDF verified)
   { name: "Paneer Tikka", calories: 200, protein: 16, carbs: 5, fat: 13, fiber: 1.0 },
   { name: "Milk", calories: 42, protein: 3.4, carbs: 5, fat: 1, fiber: 0 },                     // whole, per 100ml
   { name: "Skimmed Milk", calories: 34, protein: 3.4, carbs: 5, fat: 0.1, fiber: 0 },           // per 100ml
@@ -130,7 +130,7 @@ export const FOOD_DATABASE = [
   { name: "Cheese", calories: 402, protein: 25, carbs: 1.3, fat: 33, fiber: 0 },                // cheddar
   { name: "Cottage Cheese", calories: 98, protein: 11, carbs: 3.4, fat: 4.3, fiber: 0 },
   { name: "Butter", calories: 717, protein: 0.9, carbs: 0.1, fat: 81, fiber: 0 },
-  { name: "Ghee", calories: 900, protein: 0, carbs: 0, fat: 100, fiber: 0 },
+  { name: "Ghee", calories: 883, protein: 0, carbs: 0, fat: 99.8, fiber: 0 },
   { name: "Cream", calories: 195, protein: 2.1, carbs: 3.9, fat: 19, fiber: 0 },
   { name: "Paneer Bhurji", calories: 220, protein: 15, carbs: 5, fat: 15, fiber: 1.0 },
 
@@ -156,10 +156,10 @@ export const FOOD_DATABASE = [
   { name: "Jackfruit", calories: 95, protein: 1.7, carbs: 23, fat: 0.6, fiber: 1.5 },
 
   // ─── Nuts & Seeds ───
-  { name: "Almonds", calories: 579, protein: 21, carbs: 22, fat: 50, fiber: 12.5 },
+  { name: "Almonds", calories: 579, protein: 21.1, carbs: 21.6, fat: 49.9, fiber: 12.5 },      // (PDF verified)
   { name: "Walnuts", calories: 654, protein: 15, carbs: 14, fat: 65, fiber: 6.7 },
   { name: "Cashews", calories: 553, protein: 18, carbs: 30, fat: 44, fiber: 3.3 },
-  { name: "Peanuts", calories: 567, protein: 26, carbs: 16, fat: 49, fiber: 8.5 },
+  { name: "Peanuts", calories: 567, protein: 25.8, carbs: 16.1, fat: 49.2, fiber: 8.5 },      // (PDF verified)
   { name: "Peanut Butter", calories: 588, protein: 25, carbs: 20, fat: 50, fiber: 6.0 },
   { name: "Pistachios", calories: 562, protein: 20, carbs: 28, fat: 45, fiber: 10.6 },
   { name: "Mixed Nuts", calories: 607, protein: 20, carbs: 18, fat: 54, fiber: 7.0 },
@@ -169,17 +169,17 @@ export const FOOD_DATABASE = [
   { name: "Coconut Dry", calories: 660, protein: 6.9, carbs: 23, fat: 64, fiber: 16.3 },        // copra/desiccated
 
   // ─── Snacks & Street Food ───
-  { name: "Samosa", calories: 260, protein: 4.0, carbs: 26, fat: 15, fiber: 2.5 },
+  { name: "Samosa", calories: 308, protein: 4.5, carbs: 32, fat: 18, fiber: 2.5 },             // (PDF verified)
   { name: "Pakora", calories: 230, protein: 4.5, carbs: 22, fat: 14, fiber: 2.0 },              // onion/bhajji
-  { name: "Vada Pav", calories: 290, protein: 5.5, carbs: 35, fat: 14, fiber: 2.5 },
+  { name: "Vada Pav", calories: 290, protein: 6.0, carbs: 42, fat: 11, fiber: 2.5 },           // (PDF verified)
   { name: "Pav Bhaji", calories: 190, protein: 5.0, carbs: 25, fat: 8.0, fiber: 3.0 },
   { name: "Bhel Puri", calories: 180, protein: 4.0, carbs: 28, fat: 6.0, fiber: 2.0 },
   { name: "Pani Puri", calories: 140, protein: 3.0, carbs: 22, fat: 4.5, fiber: 1.5 },          // golgappa
-  { name: "Dhokla", calories: 160, protein: 6.0, carbs: 25, fat: 3.5, fiber: 2.0 },
+  { name: "Dhokla", calories: 160, protein: 6.2, carbs: 22, fat: 5.1, fiber: 2.0 },            // (PDF verified)
   { name: "Kachori", calories: 280, protein: 4.5, carbs: 28, fat: 16, fiber: 2.0 },
   { name: "Aloo Tikki", calories: 210, protein: 3.5, carbs: 26, fat: 10, fiber: 2.0 },
-  { name: "Masala Dosa", calories: 210, protein: 5.0, carbs: 30, fat: 8.0, fiber: 2.0 },
-  { name: "Medu Vada", calories: 230, protein: 6.0, carbs: 22, fat: 13, fiber: 2.0 },
+  { name: "Masala Dosa", calories: 165, protein: 3.5, carbs: 26, fat: 5.5, fiber: 2.0 },       // (PDF verified)
+  { name: "Medu Vada", calories: 333, protein: 8.5, carbs: 24, fat: 22, fiber: 2.0 },          // (PDF verified)
   { name: "Chips", calories: 536, protein: 7.0, carbs: 53, fat: 35, fiber: 3.0 },               // potato crisps
   { name: "Popcorn", calories: 375, protein: 11, carbs: 74, fat: 4.3, fiber: 10.5 },             // air-popped, no butter
   { name: "Nachos", calories: 320, protein: 6.0, carbs: 38, fat: 16, fiber: 3.0 },
@@ -317,7 +317,7 @@ export const FOOD_DATABASE = [
   { name: "Papdi Chaat", calories: 190, protein: 4, carbs: 24, fat: 9, fiber: 2.0 },
   { name: "Dabeli", calories: 250, protein: 5, carbs: 34, fat: 10, fiber: 2.5 },
   { name: "Misal Pav", calories: 220, protein: 8, carbs: 28, fat: 8, fiber: 4.0 },
-  { name: "Poha", calories: 155, protein: 3, carbs: 27, fat: 4.5, fiber: 1.0 },
+  { name: "Poha", calories: 180, protein: 3, carbs: 32, fat: 4.5, fiber: 1.0 },
   { name: "Upma", calories: 150, protein: 3.5, carbs: 22, fat: 5.5, fiber: 1.5 },
 
   // ─── Additional Indian Sweets ───
@@ -491,6 +491,7 @@ export const UNIT_TO_GRAMS: Record<string, number> = {
   "default:tbsp": 15,
   "default:cup": 240,         // 1 standard cup ≈ 240ml
   "default:serving": 150,     // typical serving ≈ 150g
+  "default:piece": 30,         // conservative default per piece ≈ 30g (food-specific overrides exist above)
   "default:oz": 28.35,        // 1 oz ≈ 28.35g
   "default:fl oz": 30,        // 1 fl oz ≈ 30ml
   "default:lb": 453.6,        // 1 lb ≈ 453.6g
@@ -530,27 +531,49 @@ export const UNIT_TO_GRAMS: Record<string, number> = {
   "paneer tikka:cup": 160,
   "paneer bhurji:cup": 180,
 
-  // Indian breads (per piece approximation)
+  // Indian breads (per piece AND per serving)
   "chapati:serving": 35,
+  "chapati:piece": 35,            // 1 chapati ≈ 35g
   "roti:serving": 35,
+  "roti:piece": 35,              // 1 roti ≈ 35g
   "paratha:serving": 60,
+  "paratha:piece": 60,           // 1 paratha ≈ 60g
   "naan:serving": 90,
+  "naan:piece": 90,              // 1 naan ≈ 90g
   "puri:serving": 25,
+  "puri:piece": 25,              // 1 puri ≈ 25g
   "jowar roti:serving": 40,
+  "jowar roti:piece": 40,        // 1 jowar roti ≈ 40g
   "bajra roti:serving": 40,
+  "bajra roti:piece": 40,        // 1 bajra roti ≈ 40g
+  "kulcha:piece": 80,            // 1 kulcha ≈ 80g
+  "bhatura:piece": 100,          // 1 bhatura ≈ 100g
+  "lachha paratha:piece": 70,    // 1 lachha paratha ≈ 70g
+  "thepla:piece": 40,            // 1 thepla ≈ 40g
+  "missi roti:piece": 45,        // 1 missi roti ≈ 45g
+  "thalipeeth:piece": 50,        // 1 thalipeeth ≈ 50g
+  "ragi roti:piece": 40,         // 1 ragi roti ≈ 40g
 
   // South Indian
   "dosa:serving": 85,
+  "dosa:piece": 85,              // 1 plain dosa ≈ 85g
   "masala dosa:serving": 150,
+  "masala dosa:piece": 150,      // 1 masala dosa ≈ 150g
   "idli:serving": 40,
+  "idli:piece": 40,              // 1 idli ≈ 40g
   "medu vada:serving": 70,
   "upma:cup": 235,
   "sambhar:cup": 245,
   "rasam:cup": 245,
+  "uttapam:piece": 120,          // 1 uttapam ≈ 120g
+  "appam:piece": 50,             // 1 appam ≈ 50g
+  "pesarattu:piece": 60,         // 1 pesarattu ≈ 60g
 
   // Breakfast items
   "poha:cup": 180,
   "vermicelli:cup": 180,
+  "pongal:serving": 200,         // 1 serving ven pongal ≈ 200g
+  "khichdi:serving": 200,        // 1 serving khichdi ≈ 200g
 
   // Lentils/Dal (cooked)
   "dal:cup": 210,
@@ -588,58 +611,117 @@ export const UNIT_TO_GRAMS: Record<string, number> = {
   "mushroom:cup": 86,
   "salad:cup": 55,
 
-  // Fruits (per piece approx)
+  // Fruits (per piece AND per serving approx)
   "banana:serving": 118,      // 1 medium banana
+  "banana:piece": 118,         // 1 medium banana ≈ 118g
   "apple:serving": 182,       // 1 medium apple
+  "apple:piece": 182,          // 1 medium apple ≈ 182g
   "mango:serving": 200,       // 1 cup pieces
+  "mango:piece": 200,          // 1 whole mango ≈ 200g
   "orange:serving": 131,      // 1 medium
+  "orange:piece": 131,         // 1 medium orange ≈ 131g
   "papaya:serving": 140,      // 1 cup cubed
+  "papaya:piece": 300,         // 1 small papaya ≈ 300g (1 slice ≈ 150g)
   "watermelon:cup": 152,
+  "watermelon:piece": 286,     // 1 wedge/slice ≈ 286g
   "grapes:cup": 151,
   "pineapple:cup": 165,
+  "pineapple:piece": 165,      // 1 ring/slice ≈ 165g
   "pomegranate:cup": 174,
+  "pomegranate:piece": 282,    // 1 whole pomegranate ≈ 282g
   "guava:cup": 165,
+  "guava:piece": 55,           // 1 guava ≈ 55g
   "coconut:serving": 80,      // 1/2 cup shredded
   "dates:cup": 178,
+  "strawberry:piece": 12,      // 1 strawberry ≈ 12g
+  "kiwi:piece": 75,            // 1 kiwi ≈ 75g
+  "pear:piece": 178,           // 1 medium pear ≈ 178g
+  "peach:piece": 150,          // 1 medium peach ≈ 150g
+  "chikoo:piece": 120,         // 1 chikoo/sapota ≈ 120g
+  "custard apple:piece": 150,  // 1 custard apple ≈ 150g
+  "jackfruit:piece": 30,       // 1 jackfruit bulb ≈ 30g
 
   // Eggs
   "egg:serving": 50,          // 1 large egg ≈ 50g
+  "egg:piece": 50,              // 1 egg ≈ 50g
   "egg white:cup": 243,
+  "egg white:piece": 33,        // 1 egg white ≈ 33g
 
-  // Nuts & Seeds
+  // Nuts & Seeds (per cup AND per piece)
   "almonds:cup": 143,
+  "almonds:piece": 1.3,           // 1 almond ≈ 1.3g
+  "almond:piece": 1.3,             // 1 almond (singular) ≈ 1.3g
   "walnuts:cup": 117,
+  "walnuts:piece": 2.5,           // 1 walnut half ≈ 2.5g
+  "walnut:piece": 2.5,             // 1 walnut (singular) ≈ 2.5g
   "cashews:cup": 137,
+  "cashews:piece": 1.5,           // 1 cashew ≈ 1.5g
+  "cashew:piece": 1.5,             // 1 cashew (singular) ≈ 1.5g
   "peanuts:cup": 146,
+  "peanuts:piece": 0.7,           // 1 peanut ≈ 0.7g
+  "peanut:piece": 0.7,             // 1 peanut (singular) ≈ 0.7g
   "peanut butter:tbsp": 16,
   "pistachios:cup": 123,
+  "pistachios:piece": 0.5,        // 1 pistachio kernel ≈ 0.5g
+  "pistachio:piece": 0.5,          // 1 pistachio (singular) ≈ 0.5g
   "mixed nuts:cup": 137,
+  "mixed nuts:piece": 1.2,        // 1 average mixed nut ≈ 1.2g
   "chia seeds:tbsp": 12,
   "flax seeds:tbsp": 10.3,
   "sunflower seeds:cup": 134,
+  "sunflower seeds:piece": 0.1,    // 1 sunflower seed kernel ≈ 0.1g
+  "dates:piece": 7,               // 1 date ≈ 7g (Medjool ~24g, Deglet Noor ~7g)
+  "coconut:piece": 20,            // 1 small piece of fresh coconut ≈ 20g
+  "coconut dry:piece": 5,         // 1 small piece dried coconut ≈ 5g
 
-  // Snacks & street food (per piece/serving)
+  // Snacks & street food (per piece AND per serving)
   "samosa:serving": 80,
+  "samosa:piece": 80,              // 1 samosa ≈ 80g
   "pakora:serving": 35,
+  "pakora:piece": 15,              // 1 pakora ≈ 15g
   "vada pav:serving": 150,
+  "vada pav:piece": 150,           // 1 vada pav ≈ 150g
   "pav bhaji:cup": 240,
   "bhel puri:serving": 100,
+  "bhel puri:piece": 100,
   "pani puri:serving": 30,
+  "pani puri:piece": 10,           // 1 puri ≈ 10g (without water)
   "dhokla:serving": 60,
+  "dhokla:piece": 30,              // 1 dhokla piece ≈ 30g
   "kachori:serving": 60,
+  "kachori:piece": 60,             // 1 kachori ≈ 60g
   "aloo tikki:serving": 80,
+  "aloo tikki:piece": 80,          // 1 aloo tikki ≈ 80g
+  "medu vada:piece": 70,           // 1 medu vada ≈ 70g
 
-  // Sweets
+  // Sweets (per piece AND per serving)
   "gulab jamun:serving": 50,
+  "gulab jamun:piece": 50,          // 1 gulab jamun ≈ 50g
   "rasgulla:serving": 55,
+  "rasgulla:piece": 55,            // 1 rasgulla ≈ 55g
   "jalebi:serving": 50,
+  "jalebi:piece": 20,              // 1 jalebi piece ≈ 20g
   "ladoo:serving": 40,
+  "ladoo:piece": 40,               // 1 ladoo ≈ 40g
   "barfi:serving": 35,
+  "barfi:piece": 25,               // 1 barfi piece ≈ 25g
   "halwa:cup": 240,
   "kheer:cup": 245,
   "rasmalai:serving": 50,
+  "rasmalai:piece": 50,            // 1 rasmalai ≈ 50g
   "ice cream:cup": 132,
+  "ice cream:serving": 132,
   "mysore pak:serving": 40,
+  "mysore pak:piece": 25,          // 1 mysore pak piece ≈ 25g
+  "soan papdi:piece": 25,          // 1 soan papdi cube ≈ 25g
+  "peda:piece": 20,                // 1 peda ≈ 20g
+  "sandesh:piece": 30,             // 1 sandesh ≈ 30g
+  "kaju katli:piece": 15,          // 1 kaju katli piece ≈ 15g
+  "gajar halwa:serving": 80,
+  "gajar halwa:piece": 80,         // 1 serving ≈ 80g
+  "shrikhand:cup": 245,
+  "imarti:piece": 60,              // 1 imarti ≈ 60g
+  "malpua:piece": 50,              // 1 malpua ≈ 50g
 
   // Beverages (per cup = 240ml typical)
   "chai:cup": 240,
@@ -661,10 +743,17 @@ export const UNIT_TO_GRAMS: Record<string, number> = {
 
   // Protein supplements (dry powder)
   "whey protein:serving": 30,        // 1 scoop
+  "whey protein:piece": 30,
   "whey protein isolate:serving": 30,
+  "whey protein isolate:piece": 30,
   "casein protein:serving": 33,
+  "casein protein:piece": 33,
   "soy protein:serving": 30,
+  "soy protein:piece": 30,
   "protein bar:serving": 60,
+  "protein bar:piece": 60,
+  "protein shake:piece": 300,
+  "protein smoothie:piece": 350,
 
   // Oils & condiments
   "olive oil:tbsp": 14,
@@ -690,22 +779,39 @@ export const UNIT_TO_GRAMS: Record<string, number> = {
 
   // Western
   "pizza:serving": 150,        // 2 slices
+  "pizza:piece": 107,            // 1 slice ≈ 107g
   "burger:serving": 200,
+  "burger:piece": 200,           // 1 burger ≈ 200g
   "sandwich:serving": 150,
+  "sandwich:piece": 150,         // 1 sandwich ≈ 150g
   "wrap:serving": 180,
+  "wrap:piece": 180,             // 1 wrap ≈ 180g
   "french fries:serving": 117,
   "chips:serving": 28,
   "popcorn:cup": 8,
   "nachos:serving": 60,
   "cookie:serving": 30,
+  "cookie:piece": 30,            // 1 cookie ≈ 30g
   "cake:serving": 80,
+  "cake:piece": 80,              // 1 slice ≈ 80g
   "brownie:serving": 55,
+  "brownie:piece": 55,           // 1 brownie ≈ 55g
   "donut:serving": 60,
+  "donut:piece": 60,             // 1 donut ≈ 60g
   "pancakes:serving": 77,
+  "pancakes:piece": 77,          // 1 pancake ≈ 77g
   "waffles:serving": 75,
+  "waffles:piece": 75,           // 1 waffle ≈ 75g
   "french toast:serving": 65,
+  "french toast:piece": 65,      // 1 slice ≈ 65g
   "chocolate:serving": 40,
+  "chocolate:piece": 10,         // 1 piece/square ≈ 10g
   "dark chocolate:serving": 30,
+  "dark chocolate:piece": 10,    // 1 piece/square ≈ 10g
+  "muffin:piece": 110,           // 1 muffin ≈ 110g
+  "croissant:piece": 67,         // 1 croissant ≈ 67g
+  "scone:piece": 55,             // 1 scone ≈ 55g
+  "tart:piece": 80,              // 1 tart ≈ 80g
 };
 
 export const WORKOUT_TYPES = [

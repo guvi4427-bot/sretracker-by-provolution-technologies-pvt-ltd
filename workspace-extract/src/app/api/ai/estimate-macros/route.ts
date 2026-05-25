@@ -139,9 +139,36 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
     return quantity * UNIT_TO_GRAMS[defaultKey];
   }
 
-  // ── Step 6: Common units not in any defaults (includes Indian-specific + supplement) ──
+  // ── Step 6: Food-category-aware piece/serving fallback ──
+  // When "piece" is used but no food-specific mapping exists, estimate weight
+  // based on what category the food likely belongs to.
+  const PIECE_WEIGHT_BY_CATEGORY: [RegExp, number][] = [
+    // Nuts & seeds (very small per piece)
+    [/\b(almond|cashew|peanut|walnut|pistachio|nut|seed|raisin|cranberry|pecan|hazelnut|macadamia|brazil nut)\b/i, 1.5],
+    // Small fruits (berry-sized)
+    [/\b(grape|berry|blueberry|strawberry|raspberry|cherry|olive|cranberry)\b/i, 5],
+    // Indian breads
+    [/\b(chapati|roti|paratha|naan|puri|kulcha|bhatura|thepla|rotli|phulka)\b/i, 40],
+    // Eggs
+    [/\b(egg)\b/i, 50],
+    // Large fruits (whole)
+    [/\b(banana|apple|mango|orange|pear|peach|guava|kiwi|lemon|lime)\b/i, 130],
+    // Small sweets/confections
+    [/\b(ladoo|peda|barfi|katli|sandesh|chikki|toffee|candy|truffle|praline)\b/i, 25],
+    // Larger sweets
+    [/\b(gulab jamun|rasgulla|rasmalai|imarti|jalebi|doughnut|donut)\b/i, 50],
+    // Indian snacks
+    [/\b(samosa|kachori|vada|tikki|pakora|bonda|cutlet)\b/i, 60],
+    // Chocolates (piece = small square)
+    [/\b(chocolate|dark chocolate)\b/i, 10],
+    // Cheese (piece = small cube/slice)
+    [/\b(cheese|paneer|tofu)\b/i, 30],
+    // Cookies/biscuits
+    [/\b(cookie|biscuit|cracker|wafer)\b/i, 30],
+  ];
+
   const EXTRA_UNIT_GRAMS: Record<string, number> = {
-    'piece': 120, 'slice': 30, 'bowl': 250, 'plate': 300,
+    'slice': 30, 'bowl': 250, 'plate': 300,
     'glass': 240, 'can': 330, 'bottle': 500, 'packet': 50, 'bar': 60,
     'scoop': 30, 'medium': 150, 'large': 250, 'small': 80, 'whole': 200,
     'half': 100, 'handful': 30, 'katori': 150,
@@ -152,6 +179,18 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
     // Imperial
     'oz': 28.35, 'fl oz': 30, 'lb': 453.6,
   };
+
+  // For "piece" unit, use category-aware estimation instead of a flat 120g default
+  if (u === 'piece') {
+    for (const [pattern, weight] of PIECE_WEIGHT_BY_CATEGORY) {
+      if (pattern.test(mealName)) {
+        return quantity * weight;
+      }
+    }
+    // No category match: use a conservative default of 30g per piece
+    // (covers most medium food items; better than the old 120g which was wildly wrong for small items)
+    return quantity * 30;
+  }
 
   if (EXTRA_UNIT_GRAMS[u]) {
     return quantity * EXTRA_UNIT_GRAMS[u];
