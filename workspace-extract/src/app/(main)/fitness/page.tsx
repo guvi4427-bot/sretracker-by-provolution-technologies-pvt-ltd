@@ -21,7 +21,7 @@ const TABS_LIST = ['overview', 'nutrition', 'workouts', 'progress', 'aiCoach'];
 const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
 const GOALS = ['lose', 'maintain', 'gain'];
 const WORKOUT_TYPES = ['Running', 'Walking', 'Cycling', 'Swimming', 'Weight Training', 'HIIT', 'Yoga', 'Pilates', 'Dance', 'Boxing', 'Jump Rope', 'Other'];
-const SERVING_UNITS = ['g', 'tsp', 'ml', 'serving', 'cup', 'tbsp', 'piece', 'slice', 'bowl', 'plate', 'glass', 'scoop', 'bar', 'oz', 'katori', 'handful'];
+const SERVING_UNITS = ['g', 'ml', 'mg', 'serving', 'cup', 'tbsp', 'tsp', 'scoop', 'piece', 'slice', 'bowl', 'plate', 'glass', 'bar', 'capsule', 'tablet', 'softgel', 'gummy', 'sachet', 'oz', 'katori', 'handful', 'can'];
 
 const WEIGHT_TYPES = ['Running', 'Walking', 'Cycling', 'Swimming', 'Weight Training',
   'HIIT', 'Yoga', 'Pilates', 'Dance', 'Boxing', 'Jump Rope', 'Other'] as const;
@@ -850,7 +850,7 @@ export default function FitnessPage() {
             <Button onClick={estimateMacros} disabled={aiEstimating} variant="ghost" className="text-purple-400 border border-purple-500/20 w-full mb-2">
               {aiEstimating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Sparkles className="w-4 h-4 mr-1" />}{t('fitness.aiEstimateMacros')}
             </Button>
-            {mealSource && <span className={`text-xs px-2 py-0.5 rounded-full ${mealSource === 'database+ai' ? 'bg-blue-600/20 text-blue-400' : mealSource === 'database' ? 'bg-green-600/20 text-green-400' : 'bg-amber-600/20 text-amber-400'}`}>{mealSource === 'database+ai' ? 'DB + AI Verified' : mealSource === 'database' ? t('fitness.fromDatabase') : t('fitness.aiEstimated')}</span>}
+            {mealSource && <span className={`text-xs px-2 py-0.5 rounded-full ${['database+ai','supplement_db+ai','brand_db+ai','food_database+ai'].includes(mealSource) ? 'bg-blue-600/20 text-blue-400' : ['database','supplement_database','brand_database','food_database'].includes(mealSource) ? 'bg-green-600/20 text-green-400' : mealSource === 'local' ? 'bg-red-600/20 text-red-400' : 'bg-amber-600/20 text-amber-400'}`}>{mealSource === 'database+ai' ? 'DB + AI Verified' : mealSource === 'supplement_db+ai' ? 'Supplement DB + AI' : mealSource === 'brand_db+ai' ? 'Brand DB + AI' : mealSource === 'food_database+ai' ? 'Food DB + AI' : mealSource === 'brand_database' ? 'Brand Database' : mealSource === 'supplement_database' ? 'Supplement DB' : mealSource === 'database' ? t('fitness.fromDatabase') : mealSource === 'local' ? 'Estimated' : t('fitness.aiEstimated')}</span>}
             {estimatedMacros && (
               <div className="grid grid-cols-5 gap-2 mt-2">
                 <div className="text-center"><p className="text-sm font-bold text-foreground">{estimatedMacros.calories?.toFixed(0)}</p><p className="text-[10px] text-muted-foreground/70">cal</p></div>
