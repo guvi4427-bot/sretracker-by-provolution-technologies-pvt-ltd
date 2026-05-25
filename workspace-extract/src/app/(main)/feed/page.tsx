@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { Heart, MessageCircle, Repeat2, MoreHorizontal, Send, Trash2, Flag, Loader2, BookOpen, AlertTriangle, Bookmark, Rss, FileText, ChevronRight, Globe, Sparkles, Video, Edit3, ExternalLink, Film, PenTool, Check, Dumbbell, TrendingUp, Activity } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, MoreHorizontal, Send, Trash2, Flag, Loader2, BookOpen, AlertTriangle, Bookmark, Rss, FileText, ChevronRight, Globe, Sparkles, Video, Edit3, ExternalLink, Film, PenTool, Check, Dumbbell, TrendingUp, Activity, Flame, Scale, Zap, Trophy } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { AdCard } from '@/components/ad-banner';
 import { Button } from '@/components/ui/button';
@@ -103,10 +103,15 @@ export default function FeedPage() {
   const abortRef = useRef<AbortController|null>(null);
   const initialLoadRef = useRef(false);
 
-  // Live Status data
+  // Live Status data (own data for Live tab)
   const [feedWeightLogs, setFeedWeightLogs] = useState<any[]>([]);
   const [feedWorkouts, setFeedWorkouts] = useState<any[]>([]);
   const [feedContentEntries, setFeedContentEntries] = useState<any[]>([]);
+
+  // Other users' live updates for Feed tab
+  const [liveContentUpdates, setLiveContentUpdates] = useState<any[]>([]);
+  const [liveFitnessUpdates, setLiveFitnessUpdates] = useState<any[]>([]);
+  const [liveWeightUpdates, setLiveWeightUpdates] = useState<any[]>([]);
 
   const fetchPosts = useCallback(async (showSkeleton = false) => {
     if (abortRef.current) abortRef.current.abort();
@@ -125,7 +130,7 @@ export default function FeedPage() {
     } catch (e: any) { if (e.name !== 'AbortError') setLoading(false); }
   }, []);
 
-  // Fetch user's fitness & content data for Live Status tab
+  // Fetch user's own fitness & content data for Live Status tab
   const fetchLiveData = useCallback(async () => {
     try {
       const [wRes, wlRes, eRes] = await Promise.all([
@@ -139,14 +144,27 @@ export default function FeedPage() {
     } catch {}
   }, []);
 
-  useEffect(() => { fetchPosts(true); fetchLiveData(); }, [fetchPosts, fetchLiveData]);
+  // Fetch other users' live updates for Feed tab
+  const fetchLiveUpdates = useCallback(async () => {
+    try {
+      const r = await fetch('/api/feed/live-updates');
+      if (r.ok) {
+        const d = await r.json();
+        setLiveContentUpdates(d.contentUpdates || []);
+        setLiveFitnessUpdates(d.fitnessUpdates || []);
+        setLiveWeightUpdates(d.weightUpdates || []);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchPosts(true); fetchLiveData(); fetchLiveUpdates(); }, [fetchPosts, fetchLiveData, fetchLiveUpdates]);
 
   // Listen for xp-updated events to refresh live data
   useEffect(() => {
-    const handler = () => { fetchLiveData(); };
+    const handler = () => { fetchLiveData(); fetchLiveUpdates(); };
     window.addEventListener('xp-updated', handler);
     return () => { window.removeEventListener('xp-updated', handler); };
-  }, [fetchLiveData]);
+  }, [fetchLiveData, fetchLiveUpdates]);
 
   // Visibility/focus refetch
   useEffect(() => {
@@ -157,7 +175,280 @@ export default function FeedPage() {
     return () => { document.removeEventListener('visibilitychange', handler); window.removeEventListener('focus', handler); };
   }, [fetchPosts]);
 
-  // Hashtag grouping
+  // ── Live update card components ──
+
+  function ContentLiveUpdateCard({ update }: { update: any }) {
+    const ct = update.contentType || 'post';
+    const pipeline = getPipeline(ct);
+    const currentIdx = getPipelineStepIndex(ct, update.liveStatus || 'not_started');
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0">
+            <AvatarFallback className="bg-purple-600/30 text-purple-300 text-xs">{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <span className="text-blue-400">✓</span>}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+
+            {/* Live content card with pipeline — same visual as attached screenshot */}
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 ${ct === 'blog' ? 'bg-purple-600/20 text-purple-400' : ct === 'video' ? 'bg-red-600/20 text-red-400' : 'bg-blue-600/20 text-blue-400'}`}>
+                  {contentTypeIcon(ct)}
+                  {contentTypeLabel(ct)}
+                </span>
+                <p className="text-sm font-medium text-foreground truncate">{update.title}</p>
+              </div>
+
+              {/* Pipeline Steps */}
+              <div className="flex items-center gap-0">
+                {pipeline.map((step, idx) => {
+                  const isCompleted = idx < currentIdx;
+                  const isCurrent = idx === currentIdx;
+                  const StepIcon = step.icon;
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                      <div className={`relative flex items-center justify-center w-7 h-7 rounded-full shrink-0 transition-all duration-300 ${isCompleted ? 'bg-green-500 text-white shadow-md shadow-green-500/20' : ''} ${isCurrent ? `${step.color} ring-2 ring-offset-1 ring-offset-background ring-current scale-110` : ''} ${!isCompleted && !isCurrent ? 'bg-white/5 text-muted-foreground/40' : ''}`}>
+                        {isCompleted ? <Check size={12} strokeWidth={3} /> : isCurrent ? <StepIcon size={12} /> : <StepIcon size={11} />}
+                        {isCurrent && <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-current" />}
+                      </div>
+                      {idx < pipeline.length - 1 && (
+                        <div className={`h-0.5 flex-1 mx-1 rounded-full transition-all duration-500 ${isCompleted ? 'bg-green-500/60' : isCurrent ? 'bg-gradient-to-r from-current/40 to-transparent' : 'bg-white/5'}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Step Labels */}
+              <div className="flex items-center mt-1.5">
+                {pipeline.map((step, idx) => (
+                  <div key={step.key} className={`flex-1 text-center last:flex-none ${idx === currentIdx ? 'text-foreground' : 'text-muted-foreground/40'}`}>
+                    <span className={`text-[9px] font-medium ${idx === currentIdx ? step.color.split(' ')[0] : ''}`}>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {currentIdx === pipeline.length - 1 && (
+                <div className="flex justify-end mt-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600/20 text-green-400 font-medium flex items-center gap-1">
+                    <Check size={10} /> Live
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Hashtag pills */}
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span
+                  key={tag}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-purple-600/15 text-purple-300 cursor-pointer hover:bg-purple-600/25 transition-colors"
+                  onClick={() => router.push(`/discover?q=${encodeURIComponent('#' + tag)}`)}
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  function FitnessLiveUpdateCard({ update }: { update: any }) {
+    const isWorkout = update.subType === 'workout';
+    const isGaining = update.hashtags?.includes('gains');
+    const goalLabel = isGaining ? 'Gains' : 'Shredding';
+    const goalColor = isGaining ? 'text-green-400' : 'text-orange-400';
+    const goalBg = isGaining ? 'bg-green-600/15' : 'bg-orange-600/15';
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0">
+            <AvatarFallback className={isGaining ? 'bg-green-600/30 text-green-300 text-xs' : 'bg-orange-600/30 text-orange-300 text-xs'}>{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <span className="text-blue-400">✓</span>}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+
+            {/* Fitness update card */}
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 ${isGaining ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400'}`}>
+                  {isWorkout ? <Dumbbell size={12} /> : <Scale size={12} />}
+                  {isWorkout ? 'Workout' : 'Weight Update'}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${goalBg} ${goalColor} font-medium`}>
+                  <Trophy size={10} className="inline mr-0.5" />{goalLabel}
+                </span>
+              </div>
+
+              {isWorkout ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <Flame size={14} className="text-red-400" />
+                      <span className="text-sm font-semibold text-foreground">{update.workoutType}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{update.duration} min</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {update.estimatedCalories && (
+                      <div className="flex items-center gap-1">
+                        <Zap size={12} className="text-amber-400" />
+                        <span className="text-xs text-amber-300 font-medium">{update.estimatedCalories} cal</span>
+                      </div>
+                    )}
+                    {update.muscleGroup && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-600/15 text-blue-300">{update.muscleGroup}</span>
+                    )}
+                    {update.sets && update.reps && (
+                      <span className="text-[10px] text-muted-foreground">{update.sets}×{update.reps}{update.loadKg ? ` @ ${update.loadKg}kg` : ''}</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Scale size={16} className={isGaining ? 'text-green-400' : 'text-orange-400'} />
+                  <span className="text-lg font-bold text-foreground">{update.weight} kg</span>
+                  <span className="text-xs text-muted-foreground">{update.date}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Hashtag pills */}
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span
+                  key={tag}
+                  className={`text-[10px] px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-colors ${isGaining ? 'bg-green-600/15 text-green-300' : 'bg-orange-600/15 text-orange-300'}`}
+                  onClick={() => router.push(`/discover?q=${encodeURIComponent('#' + tag)}`)}
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  // ── Build merged feed: posts + live updates, sorted by time, grouped by hashtags ──
+  const mergedFeedItems = useMemo(() => {
+    type FeedItem = {
+      id: string;
+      sortTime: number;
+      type: 'post' | 'content_update' | 'fitness_update';
+      hashtags: string[];
+      data: any;
+    };
+
+    const items: FeedItem[] = [];
+
+    // Add regular posts
+    const safePosts = Array.isArray(posts) ? posts : [];
+    safePosts.forEach((p: any) => {
+      let tags: string[] = [];
+      try {
+        tags = (Array.isArray(p.hashtags) ? p.hashtags : JSON.parse(p.hashtags || '[]')).map((tg: string) => tg.toLowerCase());
+      } catch {}
+      items.push({
+        id: p.id,
+        sortTime: new Date(p.createdAt).getTime(),
+        type: 'post',
+        hashtags: tags,
+        data: p,
+      });
+    });
+
+    // Add content live updates
+    liveContentUpdates.forEach((u: any) => {
+      items.push({
+        id: `content-${u.id}`,
+        sortTime: new Date(u.updatedAt || u.createdAt).getTime(),
+        type: 'content_update',
+        hashtags: u.hashtags || ['content', 'progress'],
+        data: u,
+      });
+    });
+
+    // Add fitness live updates (workouts)
+    liveFitnessUpdates.forEach((u: any) => {
+      items.push({
+        id: `fitness-${u.id}`,
+        sortTime: new Date(u.createdAt).getTime(),
+        type: 'fitness_update',
+        hashtags: u.hashtags || ['fitness', 'gains'],
+        data: u,
+      });
+    });
+
+    // Add weight updates
+    liveWeightUpdates.forEach((u: any) => {
+      items.push({
+        id: `weight-${u.id}`,
+        sortTime: new Date(u.createdAt).getTime(),
+        type: 'fitness_update',
+        hashtags: u.hashtags || ['fitness', 'gains'],
+        data: u,
+      });
+    });
+
+    // Sort by time descending
+    items.sort((a, b) => b.sortTime - a.sortTime);
+
+    // ── Hashtag grouping ──
+    // Always force-group these special tags
+    const FORCE_GROUP_TAGS = ['content', 'progress', 'fitness', 'gains', 'shredding'];
+
+    const tagCount: Record<string, number> = {};
+    items.forEach(item => {
+      item.hashtags.forEach(tg => { tagCount[tg] = (tagCount[tg] || 0) + 1; });
+    });
+
+    // Trending = any tag with 2+ posts OR any force-group tag that has items
+    const trending = Object.entries(tagCount)
+      .filter(([tg, c]) => c >= 2 || FORCE_GROUP_TAGS.includes(tg))
+      .map(([tg]) => tg);
+
+    const grouped: Record<string, FeedItem[]> = {};
+    const ungrouped: FeedItem[] = [];
+
+    items.forEach(item => {
+      // Find the first matching trending/force tag
+      const matched = item.hashtags.find(tg => trending.includes(tg));
+      if (matched) {
+        if (!grouped[matched]) grouped[matched] = [];
+        grouped[matched].push(item);
+      } else {
+        ungrouped.push(item);
+      }
+    });
+
+    // Define section order for grouped tags (live updates first)
+    const groupOrder = ['content', 'progress', 'fitness', 'gains', 'shredding'];
+    const orderedGroups = Object.entries(grouped).sort(([a], [b]) => {
+      const ai = groupOrder.indexOf(a); const bi = groupOrder.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+
+    return { orderedGroups, ungrouped };
+  }, [posts, liveContentUpdates, liveFitnessUpdates, liveWeightUpdates]);
+
+  // Legacy hashtag grouping for backward compat (still used by trending header text)
   const { grouped, ungrouped } = useMemo(() => {
     const safePosts = Array.isArray(posts) ? posts : [];
     const tagCount: Record<string, number> = {};
@@ -418,18 +709,46 @@ export default function FeedPage() {
         </div>
       </GlassCard>
 
-      {/* Trending Groups */}
-      {Object.entries(grouped).map(([tag, tagPosts]) => (
-        <div key={tag}>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">{t('feed.trending')}: #{tag}</h3>
-          <div className="space-y-3">{tagPosts.map((p: any) => <PostCard key={p.id} post={p} />)}</div>
+      {/* ═══ LIVE UPDATE SECTIONS (grouped by hashtags) ═══ */}
+      {mergedFeedItems.orderedGroups.map(([tag, items]) => {
+        const isContentTag = tag === 'content' || tag === 'progress';
+        const isFitnessTag = tag === 'fitness' || tag === 'gains' || tag === 'shredding';
+        const isGainsTag = tag === 'gains';
+        const isShredTag = tag === 'shredding';
+        const headerIcon = isContentTag ? <Video size={14} className="text-purple-400" /> : isFitnessTag ? <Dumbbell size={14} className={isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400'} /> : <Rss size={14} className="text-blue-400" />;
+        const headerColor = isContentTag ? 'text-purple-400' : isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400';
+
+        return (
+          <div key={tag}>
+            <div className="flex items-center gap-1.5 mb-2">
+              {headerIcon}
+              <h3 className={`text-sm font-medium ${headerColor}`}>#{tag}</h3>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-muted-foreground/50 ml-1">{items.length} update{items.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="space-y-3">
+              {items.map((item: any) => {
+                if (item.type === 'content_update') return <ContentLiveUpdateCard key={item.id} update={item.data} />;
+                if (item.type === 'fitness_update') return <FitnessLiveUpdateCard key={item.id} update={item.data} />;
+                return <PostCard key={item.id} post={item.data} />;
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Ungrouped Posts (no matching hashtag groups) */}
+      {mergedFeedItems.ungrouped.length > 0 && (
+        <div className="space-y-3">
+          {mergedFeedItems.ungrouped.map((item: any) => {
+            if (item.type === 'content_update') return <ContentLiveUpdateCard key={item.id} update={item.data} />;
+            if (item.type === 'fitness_update') return <FitnessLiveUpdateCard key={item.id} update={item.data} />;
+            return <PostCard key={item.id} post={item.data} />;
+          })}
         </div>
-      ))}
+      )}
 
-      {/* Ungrouped Posts */}
-      <div className="space-y-3">{ungrouped.map((p: any) => <PostCard key={p.id} post={p} />)}</div>
-
-      {posts.length === 0 && !loading && (
+      {posts.length === 0 && liveContentUpdates.length === 0 && liveFitnessUpdates.length === 0 && liveWeightUpdates.length === 0 && !loading && (
         <GlassCard className="p-8 text-center">
           <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
         </GlassCard>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles } from 'lucide-react';
+import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,20 +13,67 @@ import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['posts', 'topics', 'groups', 'users'];
+const TABS = ['posts', 'liveupdates', 'topics', 'groups', 'users'];
+
+// Live status pipeline per content type (shared with feed page)
+const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color: string; icon: any }[]> = {
+  blog: [
+    { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: FileText },
+    { key: 'written', label: 'Written', color: 'text-blue-400 bg-blue-600/20', icon: PenTool },
+    { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },
+  ],
+  video: [
+    { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: Film },
+    { key: 'shoot', label: 'Shoot', color: 'text-red-400 bg-red-600/20', icon: Video },
+    { key: 'edit', label: 'Edit', color: 'text-amber-400 bg-amber-600/20', icon: Edit3 },
+    { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },
+  ],
+  post: [
+    { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: FileText },
+    { key: 'shoot', label: 'Shoot', color: 'text-red-400 bg-red-600/20', icon: Video },
+    { key: 'edit', label: 'Edit', color: 'text-amber-400 bg-amber-600/20', icon: Edit3 },
+    { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },
+  ],
+};
+
+function getPipeline(contentType: string) {
+  return LIVE_STATUS_PIPELINES[contentType] || LIVE_STATUS_PIPELINES.post;
+}
+
+function getPipelineStepIndex(contentType: string, liveStatus: string) {
+  const pipeline = getPipeline(contentType);
+  return pipeline.findIndex(s => s.key === liveStatus);
+}
+
+const contentTypeIcon = (type: string) => {
+  switch (type) {
+    case 'blog': return <FileText size={12} />;
+    case 'video': return <Film size={12} />;
+    default: return <PenTool size={12} />;
+  }
+};
+
+const contentTypeLabel = (type: string) => {
+  switch (type) {
+    case 'blog': return 'Blog';
+    case 'video': return 'Video';
+    case 'post': return 'Post';
+    default: return type;
+  }
+};
 
 export default function DiscoverPage() {
   const router = useRouter();
   const { profile } = useUserStore();
   const [activeTab, setActiveTab] = useState('posts');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>({ posts: [], topics: [], groups: [], users: [] });
+  const [results, setResults] = useState<any>({ posts: [], liveupdates: [], topics: [], groups: [], users: [] });
   const [loading, setLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState<string|null>(null);
 
   const search = useCallback(async (type?: string) => {
     const tab = type || activeTab;
-    if (!query.trim() && tab !== 'groups' && tab !== 'topics') { setResults({ posts: [], topics: [], groups: [], users: [] }); return; }
+    if (!query.trim() && tab !== 'groups' && tab !== 'topics' && tab !== 'liveupdates') { setResults({ posts: [], liveupdates: [], topics: [], groups: [], users: [] }); return; }
     setLoading(true);
     try {
       const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(query.toLowerCase())}`);
@@ -38,13 +85,20 @@ export default function DiscoverPage() {
     } catch {} finally { setLoading(false); }
   }, [query, activeTab]);
 
-  useEffect(() => { if (activeTab === 'groups' || activeTab === 'topics' || query.trim()) search(); }, [activeTab, search]);
+  useEffect(() => { if (activeTab === 'groups' || activeTab === 'topics' || activeTab === 'liveupdates' || query.trim()) search(); }, [activeTab, search]);
 
-  // Handle URL query param
+  // Handle URL query param — also auto-switch to liveupdates tab for hashtag searches
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q');
-    if (q) { setQuery(q); }
+    if (q) {
+      setQuery(q);
+      // Auto-switch to liveupdates for specific hashtags
+      const cleanQ = q.replace(/^#/, '').toLowerCase();
+      if (['content', 'progress', 'fitness', 'gains', 'shredding'].includes(cleanQ)) {
+        setActiveTab('liveupdates');
+      }
+    }
   }, []);
 
   async function followUser(userId: string) {
@@ -77,6 +131,149 @@ export default function DiscoverPage() {
     });
   }
 
+  // ── Live update card renderers for discover ──
+  function DiscoverContentCard({ update }: { update: any }) {
+    const ct = update.contentType || 'post';
+    const pipeline = getPipeline(ct);
+    const currentIdx = getPipelineStepIndex(ct, update.liveStatus || 'not_started');
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0">
+            <AvatarFallback className="bg-purple-600/30 text-purple-300 text-xs">{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 ${ct === 'blog' ? 'bg-purple-600/20 text-purple-400' : ct === 'video' ? 'bg-red-600/20 text-red-400' : 'bg-blue-600/20 text-blue-400'}`}>
+                  {contentTypeIcon(ct)} {contentTypeLabel(ct)}
+                </span>
+                <p className="text-sm font-medium text-foreground truncate">{update.title}</p>
+              </div>
+              <div className="flex items-center gap-0">
+                {pipeline.map((step, idx) => {
+                  const isCompleted = idx < currentIdx;
+                  const isCurrent = idx === currentIdx;
+                  const StepIcon = step.icon;
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                      <div className={`relative flex items-center justify-center w-7 h-7 rounded-full shrink-0 transition-all duration-300 ${isCompleted ? 'bg-green-500 text-white shadow-md shadow-green-500/20' : ''} ${isCurrent ? `${step.color} ring-2 ring-offset-1 ring-offset-background ring-current scale-110` : ''} ${!isCompleted && !isCurrent ? 'bg-white/5 text-muted-foreground/40' : ''}`}>
+                        {isCompleted ? <Check size={12} strokeWidth={3} /> : isCurrent ? <StepIcon size={12} /> : <StepIcon size={11} />}
+                        {isCurrent && <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-current" />}
+                      </div>
+                      {idx < pipeline.length - 1 && (
+                        <div className={`h-0.5 flex-1 mx-1 rounded-full transition-all duration-500 ${isCompleted ? 'bg-green-500/60' : isCurrent ? 'bg-gradient-to-r from-current/40 to-transparent' : 'bg-white/5'}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center mt-1.5">
+                {pipeline.map((step, idx) => (
+                  <div key={step.key} className={`flex-1 text-center last:flex-none ${idx === currentIdx ? 'text-foreground' : 'text-muted-foreground/40'}`}>
+                    <span className={`text-[9px] font-medium ${idx === currentIdx ? step.color.split(' ')[0] : ''}`}>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+              {currentIdx === pipeline.length - 1 && (
+                <div className="flex justify-end mt-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600/20 text-green-400 font-medium flex items-center gap-1">
+                    <Check size={10} /> Live
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-purple-600/15 text-purple-300 cursor-pointer hover:bg-purple-600/25 transition-colors">#{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  function DiscoverFitnessCard({ update }: { update: any }) {
+    const isWorkout = update.subType === 'workout';
+    const isGaining = update.hashtags?.includes('gains');
+    const goalLabel = isGaining ? 'Gains' : 'Shredding';
+    const goalColor = isGaining ? 'text-green-400' : 'text-orange-400';
+    const goalBg = isGaining ? 'bg-green-600/15' : 'bg-orange-600/15';
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0">
+            <AvatarFallback className={isGaining ? 'bg-green-600/30 text-green-300 text-xs' : 'bg-orange-600/30 text-orange-300 text-xs'}>{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 ${isGaining ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400'}`}>
+                  {isWorkout ? <Dumbbell size={12} /> : <Scale size={12} />}
+                  {isWorkout ? 'Workout' : 'Weight Update'}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${goalBg} ${goalColor} font-medium`}>
+                  <Trophy size={10} className="inline mr-0.5" />{goalLabel}
+                </span>
+              </div>
+              {isWorkout ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <Flame size={14} className="text-red-400" />
+                      <span className="text-sm font-semibold text-foreground">{update.workoutType}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{update.duration} min</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {update.estimatedCalories && (
+                      <div className="flex items-center gap-1">
+                        <Zap size={12} className="text-amber-400" />
+                        <span className="text-xs text-amber-300 font-medium">{update.estimatedCalories} cal</span>
+                      </div>
+                    )}
+                    {update.muscleGroup && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-600/15 text-blue-300">{update.muscleGroup}</span>
+                    )}
+                    {update.sets && update.reps && (
+                      <span className="text-[10px] text-muted-foreground">{update.sets}x{update.reps}{update.loadKg ? ` @ ${update.loadKg}kg` : ''}</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Scale size={16} className={isGaining ? 'text-green-400' : 'text-orange-400'} />
+                  <span className="text-lg font-bold text-foreground">{update.weight} kg</span>
+                  <span className="text-xs text-muted-foreground">{update.date}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-colors ${isGaining ? 'bg-green-600/15 text-green-300' : 'bg-orange-600/15 text-orange-300'}`}>#{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Search */}
@@ -89,7 +286,11 @@ export default function DiscoverPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-accent border border-border w-full flex">
-          {TABS.map(tab => <TabsTrigger key={tab} value={tab} className="text-muted-foreground data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20 text-xs flex-1">{t(`discover.${tab}`)}</TabsTrigger>)}
+          {TABS.map(tab => (
+            <TabsTrigger key={tab} value={tab} className={`text-muted-foreground text-xs flex-1 ${tab === 'liveupdates' ? 'data-[state=active]:text-green-400 data-[state=active]:bg-green-600/20' : 'data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20'}`}>
+              {tab === 'liveupdates' ? <><Activity size={14} className="mr-1" />Live</> : t(`discover.${tab}`)}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="posts" className="space-y-3 mt-4">
@@ -103,6 +304,22 @@ export default function DiscoverPage() {
               <p className="text-sm text-foreground/90 whitespace-pre-wrap">{renderContent(p.content)}</p>
             </GlassCard>
           ))}
+        </TabsContent>
+
+        {/* ═══ LIVE UPDATES TAB ═══ */}
+        <TabsContent value="liveupdates" className="space-y-3 mt-4">
+          {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-green-400 animate-spin" /></div> :
+          (Array.isArray(results.liveupdates) ? results.liveupdates : []).length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <Activity className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No live updates found</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Try searching #content, #fitness, #gains, or #shredding</p>
+            </GlassCard>
+          ) : (
+            (Array.isArray(results.liveupdates) ? results.liveupdates : []).map((u: any) => (
+              u.type === 'content_update' ? <DiscoverContentCard key={u.id} update={u} /> : <DiscoverFitnessCard key={u.id} update={u} />
+            ))
+          )}
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-3 mt-4">

@@ -83,6 +83,120 @@ export async function GET(req: Request) {
       })) });
     }
 
+    // ── Live Updates search (content + fitness updates) ──
+    if (type === 'liveupdates') {
+      const cleanQ = q.replace(/^#/, ''); // strip leading #
+      const matchTag = cleanQ ? cleanQ.toLowerCase() : null;
+
+      // Fetch fitness profiles for goal lookup
+      const fitnessProfiles = await db.fitnessProfile.findMany({
+        select: { userId: true, goal: true },
+      });
+      const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
+
+      const results: any[] = [];
+
+      // Content updates — filtered by hashtag if query matches
+      if (!matchTag || matchTag === 'content' || matchTag === 'progress') {
+        const contentEntries = await db.contentEntry.findMany({
+          where: {
+            user: { profile: { isPublic: true, shareContentStatus: true } },
+          },
+          include: {
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            series: { select: { name: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 20,
+        });
+        contentEntries.forEach(e => {
+          results.push({
+            id: e.id,
+            type: 'content_update',
+            title: e.title,
+            contentType: e.contentType,
+            liveStatus: e.liveStatus,
+            status: e.status,
+            updatedAt: e.updatedAt,
+            createdAt: e.createdAt,
+            seriesName: e.series?.name || null,
+            user: { id: e.user.id, username: e.user.username, name: e.user.profile?.name || e.user.username, avatarUrl: e.user.profile?.avatarUrl, verified: e.user.profile?.verified || false },
+            hashtags: ['content', 'progress'],
+          });
+        });
+      }
+
+      // Fitness updates — filtered by hashtag if query matches
+      if (!matchTag || matchTag === 'fitness' || matchTag === 'gains' || matchTag === 'shredding') {
+        const workouts = await db.fitnessWorkoutLog.findMany({
+          where: {
+            user: { profile: { isPublic: true, shareFitnessProgress: true } },
+            createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+          },
+          include: {
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        });
+        workouts.forEach(w => {
+          const goal = goalMap.get(w.userId) || 'maintain';
+          const isGaining = goal === 'gain';
+          const tags = ['fitness', isGaining ? 'gains' : 'shredding'];
+          if (matchTag && matchTag !== 'fitness' && !tags.includes(matchTag)) return;
+          results.push({
+            id: w.id,
+            type: 'fitness_update',
+            subType: 'workout',
+            workoutType: w.workoutType,
+            duration: w.duration,
+            estimatedCalories: w.estimatedCalories,
+            muscleGroup: w.muscleGroup,
+            sets: w.sets,
+            reps: w.reps,
+            loadKg: w.loadKg,
+            date: w.date,
+            createdAt: w.createdAt,
+            user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
+            hashtags: tags,
+          });
+        });
+
+        const weightLogs = await db.fitnessWeightLog.findMany({
+          where: {
+            user: { profile: { isPublic: true, shareFitnessProgress: true } },
+            createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+          },
+          include: {
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        });
+        weightLogs.forEach(w => {
+          const goal = goalMap.get(w.userId) || 'maintain';
+          const isGaining = goal === 'gain';
+          const tags = ['fitness', isGaining ? 'gains' : 'shredding'];
+          if (matchTag && matchTag !== 'fitness' && !tags.includes(matchTag)) return;
+          results.push({
+            id: w.id,
+            type: 'fitness_update',
+            subType: 'weight',
+            weight: w.weight,
+            date: w.date,
+            createdAt: w.createdAt,
+            user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
+            hashtags: tags,
+          });
+        });
+      }
+
+      // Sort all results by time
+      results.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+
+      return NextResponse.json({ liveupdates: results });
+    }
+
     return NextResponse.json({ users: [], groups: [], topics: [] });
   } catch (error) {
     console.error('Discover error:', error);
