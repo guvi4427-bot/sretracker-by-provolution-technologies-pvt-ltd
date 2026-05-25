@@ -75,3 +75,30 @@ Stage Summary:
 - Production server running in standalone mode (not dev server)
 - All endpoints respond correctly
 - Auto-restart mechanism in place
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Migrate from Turso to Vercel Postgres (Neon) and deploy to production
+
+Work Log:
+- Discovered Prisma schema was already migrated to PostgreSQL provider (not SQLite)
+- db.ts already uses standard PrismaClient (no libsql adapter needed)
+- package.json already includes @vercel/postgres dependency
+- Cleaned up conflicting .env files that had empty DATABASE_URL from broken Neon integration
+- Deleted empty env vars from Vercel project (sre_ prefixed vars from failed Neon install)
+- Reinstalled Neon integration via `vercel install neon` — successfully provisioned neon-aquamarine-field
+- Neon integration properly connected to project (env vars now populated with real values)
+- Pushed Prisma schema to Neon Postgres database via `prisma db push`
+- Set NEXTAUTH_SECRET (auto-generated) and NEXTAUTH_URL on Vercel for all environments
+- Fixed seed.ts transaction timeout (5s → 30s) for Neon serverless
+- Seeded production database: 116 achievements + admin user created
+- Deployed to Vercel production via `vercel deploy --prod`
+- Verified all endpoints: health (200), login (200), signup (200), user creation (200)
+
+Stage Summary:
+- App deployed at: https://workspace-extract.vercel.app
+- Database: Neon Postgres (free tier) — ep-summer-meadow-ap1gupt5-pooler.c-7.us-east-1.aws.neon.tech
+- Admin credentials: myselfgowtham140707@gmail.com / Gowtham@123
+- 116 achievements seeded in database
+- All API routes functional and tested

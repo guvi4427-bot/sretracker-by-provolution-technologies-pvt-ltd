@@ -7,7 +7,6 @@ export async function seed() {
 
   try {
     await db.$transaction(async (tx) => {
-      // Seed achievements
       for (const def of ACHIEVEMENT_DEFS) {
         await tx.achievement.upsert({
           where: { key: def.key },
@@ -77,7 +76,7 @@ export async function seed() {
       });
 
       console.log(`✅ Admin user created: ${adminUser.username} (${adminUser.email})`);
-    });
+    }, { timeout: 30000 }); // 30 second timeout for Neon serverless
 
     console.log("🎉 Seeding completed successfully!");
   } catch (error) {
