@@ -734,6 +734,11 @@ export default function FitnessPage() {
           })()}
         </TabsContent>
 
+        {/* Ad — subtle separator between overview and nutrition */}
+        <div className="py-2">
+          <AdCard format="horizontal" slot="fitness_mid" />
+        </div>
+
         {/* Nutrition */}
         <TabsContent value="nutrition" className="space-y-4 mt-4">
 

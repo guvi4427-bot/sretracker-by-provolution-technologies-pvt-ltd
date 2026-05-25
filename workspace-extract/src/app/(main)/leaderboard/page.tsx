@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Search, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUserStore } from '@/stores/user-store';
@@ -45,6 +46,9 @@ export default function LeaderboardPage() {
       </div>
 
       <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('common.search')} className="bg-accent border-border text-foreground placeholder:text-muted-foreground/50" />
+
+      {/* Subtle ad between search and leaderboard list */}
+      <AdCard format="horizontal" slot="leaderboard_top" />
 
       {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> : (
         <div className="space-y-2">
