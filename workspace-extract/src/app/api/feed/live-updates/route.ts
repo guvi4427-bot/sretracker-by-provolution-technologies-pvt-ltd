@@ -7,13 +7,13 @@ import { db } from '@/lib/db';
  * GET /api/feed/live-updates
  *
  * Fetches live content & fitness updates from ALL public users
- * (excluding the logged-in user's own data, since that's already
- * visible in the Live tab).
+ * (now INCLUDING the logged-in user's own data, so they can see
+ * their live status in the Feed tab alongside other users').
  *
  * Returns three arrays:
  *  - contentUpdates: ContentEntry records with user info + pipeline data
  *  - fitnessUpdates: recent workouts with user info
- *  - weightUpdates: recent weight logs with user info
+ *  - weightUpdates: recent weight logs with user info + trend sparkline data
  */
 export async function GET(req: Request) {
   try {
@@ -25,24 +25,28 @@ export async function GET(req: Request) {
     const myUserId = session.user.id;
     const { searchParams } = new URL(req.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
+    const includeOwn = searchParams.get('includeOwn') !== 'false'; // default true
 
     // ── Fetch all fitness profiles for goal lookup ──
     const fitnessProfiles = await db.fitnessProfile.findMany({
-      select: { userId: true, goal: true },
+      select: { userId: true, goal: true, weight: true },
     });
     const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
+    const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
     // ── Content Updates ──
-    const contentEntries = await db.contentEntry.findMany({
-      where: {
-        userId: { not: myUserId },
-        user: {
-          profile: {
-            isPublic: true,
-            shareContentStatus: true,
-          },
+    const contentWhere: any = {
+      user: {
+        profile: {
+          isPublic: true,
+          shareContentStatus: true,
         },
       },
+    };
+    if (!includeOwn) contentWhere.userId = { not: myUserId };
+
+    const contentEntries = await db.contentEntry.findMany({
+      where: contentWhere,
       include: {
         user: {
           select: {
@@ -68,6 +72,7 @@ export async function GET(req: Request) {
       updatedAt: e.updatedAt,
       createdAt: e.createdAt,
       seriesName: e.series?.name || null,
+      isOwn: e.userId === myUserId,
       user: {
         id: e.user.id,
         username: e.user.username,
@@ -79,17 +84,19 @@ export async function GET(req: Request) {
     }));
 
     // ── Fitness Updates (Workouts) ──
-    const recentWorkouts = await db.fitnessWorkoutLog.findMany({
-      where: {
-        userId: { not: myUserId },
-        user: {
-          profile: {
-            isPublic: true,
-            shareFitnessProgress: true,
-          },
+    const fitnessWhere: any = {
+      user: {
+        profile: {
+          isPublic: true,
+          shareFitnessProgress: true,
         },
-        createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
       },
+      createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+    };
+    if (!includeOwn) fitnessWhere.userId = { not: myUserId };
+
+    const recentWorkouts = await db.fitnessWorkoutLog.findMany({
+      where: fitnessWhere,
       include: {
         user: {
           select: {
@@ -119,6 +126,7 @@ export async function GET(req: Request) {
         loadKg: w.loadKg,
         date: w.date,
         createdAt: w.createdAt,
+        isOwn: w.userId === myUserId,
         user: {
           id: w.user.id,
           username: w.user.username,
@@ -132,17 +140,19 @@ export async function GET(req: Request) {
     });
 
     // ── Weight Updates ──
-    const recentWeightLogs = await db.fitnessWeightLog.findMany({
-      where: {
-        userId: { not: myUserId },
-        user: {
-          profile: {
-            isPublic: true,
-            shareFitnessProgress: true,
-          },
+    const weightWhere: any = {
+      user: {
+        profile: {
+          isPublic: true,
+          shareFitnessProgress: true,
         },
-        createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
       },
+      createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+    };
+    if (!includeOwn) weightWhere.userId = { not: myUserId };
+
+    const recentWeightLogs = await db.fitnessWeightLog.findMany({
+      where: weightWhere,
       include: {
         user: {
           select: {
@@ -156,9 +166,47 @@ export async function GET(req: Request) {
       take: limit,
     });
 
+    // ── Weight trend sparkline data per user ──
+    // Collect unique user IDs from weight logs
+    const weightUserIds = [...new Set(recentWeightLogs.map(w => w.userId))];
+    const weightTrendMap = new Map<string, { date: string; weight: number }[]>();
+
+    if (weightUserIds.length > 0) {
+      const trendData = await db.fitnessWeightLog.findMany({
+        where: {
+          userId: { in: weightUserIds },
+        },
+        select: { userId: true, date: true, weight: true },
+        orderBy: { date: 'asc' },
+      });
+
+      // Group by user, take last 7 entries
+      const byUser: Record<string, { date: string; weight: number }[]> = {};
+      trendData.forEach(t => {
+        if (!byUser[t.userId]) byUser[t.userId] = [];
+        byUser[t.userId].push({ date: t.date, weight: t.weight });
+      });
+      Object.entries(byUser).forEach(([uid, entries]) => {
+        weightTrendMap.set(uid, entries.slice(-7));
+      });
+    }
+
     const weightUpdates = recentWeightLogs.map(w => {
       const goal = goalMap.get(w.userId) || 'maintain';
       const isGaining = goal === 'gain';
+      const trend = weightTrendMap.get(w.userId) || [];
+
+      // Calculate weight change direction from trend
+      let trendDirection: 'up' | 'down' | 'stable' | 'none' = 'none';
+      if (trend.length >= 2) {
+        const diff = trend[trend.length - 1].weight - trend[0].weight;
+        if (diff > 0.3) trendDirection = 'up';
+        else if (diff < -0.3) trendDirection = 'down';
+        else trendDirection = 'stable';
+      }
+
+      const currentWeight = currentWeightMap.get(w.userId) || null;
+
       return {
         id: w.id,
         type: 'fitness' as const,
@@ -166,6 +214,10 @@ export async function GET(req: Request) {
         weight: w.weight,
         date: w.date,
         createdAt: w.createdAt,
+        isOwn: w.userId === myUserId,
+        trendData: trend,
+        trendDirection,
+        currentWeight,
         user: {
           id: w.user.id,
           username: w.user.username,

@@ -136,16 +136,17 @@ export default function DiscoverPage() {
     const ct = update.contentType || 'post';
     const pipeline = getPipeline(ct);
     const currentIdx = getPipelineStepIndex(ct, update.liveStatus || 'not_started');
+    const isOwn = update.isOwn;
 
     return (
       <GlassCard className="p-4">
         <div className="flex items-start gap-3">
-          <Avatar className="h-9 w-9 border border-border shrink-0">
+          <Avatar className="h-9 w-9 border border-border shrink-0 cursor-pointer" onClick={() => router.push(`/profile/${update.user?.id}`)}>
             <AvatarFallback className="bg-purple-600/30 text-purple-300 text-xs">{update.user?.name?.[0] || '?'}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
+              <p className="text-sm font-medium text-foreground cursor-pointer hover:text-purple-300 transition-colors" onClick={() => router.push(`/profile/${update.user?.id}`)}>{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
               <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
               <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
@@ -190,6 +191,20 @@ export default function DiscoverPage() {
                 </div>
               )}
             </div>
+            {/* View Live Status CTA — like Shared Topic */}
+            <div className="mt-2">
+              <button
+                onClick={() => router.push(isOwn ? '/content' : `/profile/${update.user?.id}`)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-purple-600/10 hover:bg-purple-600/15 border border-purple-500/20 transition-colors group"
+              >
+                <Video size={14} className="text-purple-400 shrink-0" />
+                <span className="text-xs text-purple-300 font-medium flex-1 text-left">
+                  {isOwn ? 'View Your Content Pipeline' : 'View Live Status'}
+                </span>
+                <Sparkles size={10} className="text-amber-400/50 group-hover:text-amber-400 transition-colors" />
+                <ChevronRight size={14} className="text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
             <div className="flex items-center gap-1.5 mt-2">
               {update.hashtags?.map((tag: string) => (
                 <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-purple-600/15 text-purple-300 cursor-pointer hover:bg-purple-600/25 transition-colors">#{tag}</span>
@@ -204,19 +219,44 @@ export default function DiscoverPage() {
   function DiscoverFitnessCard({ update }: { update: any }) {
     const isWorkout = update.subType === 'workout';
     const isGaining = update.hashtags?.includes('gains');
+    const isOwn = update.isOwn;
     const goalLabel = isGaining ? 'Gains' : 'Shredding';
     const goalColor = isGaining ? 'text-green-400' : 'text-orange-400';
     const goalBg = isGaining ? 'bg-green-600/15' : 'bg-orange-600/15';
 
+    // Weight trend sparkline (from API trendData)
+    const trendData: { date: string; weight: number }[] = update.trendData || [];
+    const trendDirection = update.trendDirection || 'none';
+
+    // Compute sparkline heights
+    const sparkHeights = trendData.length >= 2
+      ? (() => {
+          const weights = trendData.map((t: any) => t.weight);
+          const min = Math.min(...weights);
+          const max = Math.max(...weights);
+          const range = max - min || 1;
+          return weights.map((w: number) => ((w - min) / range) * 70 + 30);
+        })()
+      : [];
+
+    // Trend arrow
+    const TrendArrow = trendDirection === 'up'
+      ? <Activity size={12} className="text-green-400" />
+      : trendDirection === 'down'
+        ? <Activity size={12} className="text-orange-400" />
+        : trendDirection === 'stable'
+          ? <Activity size={12} className="text-muted-foreground/50" />
+          : null;
+
     return (
       <GlassCard className="p-4">
         <div className="flex items-start gap-3">
-          <Avatar className="h-9 w-9 border border-border shrink-0">
+          <Avatar className="h-9 w-9 border border-border shrink-0 cursor-pointer" onClick={() => router.push(`/profile/${update.user?.id}`)}>
             <AvatarFallback className={isGaining ? 'bg-green-600/30 text-green-300 text-xs' : 'bg-orange-600/30 text-orange-300 text-xs'}>{update.user?.name?.[0] || '?'}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm font-medium text-foreground">{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
+              <p className="text-sm font-medium text-foreground cursor-pointer hover:text-blue-300 transition-colors" onClick={() => router.push(`/profile/${update.user?.id}`)}>{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
               <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
               <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
@@ -256,12 +296,48 @@ export default function DiscoverPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <Scale size={16} className={isGaining ? 'text-green-400' : 'text-orange-400'} />
-                  <span className="text-lg font-bold text-foreground">{update.weight} kg</span>
-                  <span className="text-xs text-muted-foreground">{update.date}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Scale size={16} className={isGaining ? 'text-green-400' : 'text-orange-400'} />
+                    <span className="text-lg font-bold text-foreground">{update.weight} kg</span>
+                    {TrendArrow}
+                    <span className="text-xs text-muted-foreground">{update.date}</span>
+                  </div>
+                  {/* Mini weight trend sparkline */}
+                  {sparkHeights.length >= 2 && (
+                    <div className="flex items-end gap-[3px] h-8 px-1">
+                      {sparkHeights.map((h: number, i: number) => (
+                        <div
+                          key={i}
+                          className={`flex-1 rounded-sm transition-all duration-300 ${i === sparkHeights.length - 1 ? (isGaining ? 'bg-green-400/80' : 'bg-orange-400/80') : (isGaining ? 'bg-green-400/30' : 'bg-orange-400/30')}`}
+                          style={{ height: `${h}%` }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {/* Current weight from profile */}
+                  {update.currentWeight && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-muted-foreground/50">Current:</span>
+                      <span className={`text-[10px] font-medium ${isGaining ? 'text-green-300' : 'text-orange-300'}`}>{update.currentWeight} kg</span>
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+            {/* View Fitness Dashboard CTA — like Shared Topic */}
+            <div className="mt-2">
+              <button
+                onClick={() => router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`)}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors group ${isGaining ? 'bg-green-600/10 hover:bg-green-600/15 border-green-500/20' : 'bg-orange-600/10 hover:bg-orange-600/15 border-orange-500/20'}`}
+              >
+                <Activity size={14} className={isGaining ? 'text-green-400 shrink-0' : 'text-orange-400 shrink-0'} />
+                <span className={`text-xs font-medium flex-1 text-left ${isGaining ? 'text-green-300' : 'text-orange-300'}`}>
+                  {isOwn ? 'View Your Fitness Dashboard' : `View ${update.user?.name?.split(' ')[0] || 'User'}'s Fitness`}
+                </span>
+                <Sparkles size={10} className="text-amber-400/50 group-hover:text-amber-400 transition-colors" />
+                <ChevronRight size={14} className={isGaining ? 'text-green-400 group-hover:translate-x-0.5 transition-transform' : 'text-orange-400 group-hover:translate-x-0.5 transition-transform'} />
+              </button>
             </div>
             <div className="flex items-center gap-1.5 mt-2">
               {update.hashtags?.map((tag: string) => (

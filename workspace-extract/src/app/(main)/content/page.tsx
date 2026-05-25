@@ -107,6 +107,8 @@ export default function ContentPage() {
       if (r.ok) {
         toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
         fetchEntries();
+        window.dispatchEvent(new CustomEvent('xp-updated'));
+        window.dispatchEvent(new CustomEvent('notification-updated'));
       } else {
         const d = await r.json();
         toast.error(d.error || 'Failed to update status');

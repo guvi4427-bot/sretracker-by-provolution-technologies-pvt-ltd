@@ -431,6 +431,8 @@ export default function FitnessPage() {
         fetchWeights(); // background sync
         fetchProfile();
         toast.success('Weight logged & targets updated!');
+        window.dispatchEvent(new CustomEvent('xp-updated'));
+        window.dispatchEvent(new CustomEvent('notification-updated'));
       }
     } catch {}
   }

@@ -90,9 +90,10 @@ export async function GET(req: Request) {
 
       // Fetch fitness profiles for goal lookup
       const fitnessProfiles = await db.fitnessProfile.findMany({
-        select: { userId: true, goal: true },
+        select: { userId: true, goal: true, weight: true },
       });
       const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
+      const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
       const results: any[] = [];
 
@@ -120,6 +121,7 @@ export async function GET(req: Request) {
             updatedAt: e.updatedAt,
             createdAt: e.createdAt,
             seriesName: e.series?.name || null,
+            isOwn: e.userId === session.user.id,
             user: { id: e.user.id, username: e.user.username, name: e.user.profile?.name || e.user.username, avatarUrl: e.user.profile?.avatarUrl, verified: e.user.profile?.verified || false },
             hashtags: ['content', 'progress'],
           });
@@ -157,6 +159,7 @@ export async function GET(req: Request) {
             loadKg: w.loadKg,
             date: w.date,
             createdAt: w.createdAt,
+            isOwn: w.userId === session.user.id,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });
@@ -173,11 +176,42 @@ export async function GET(req: Request) {
           orderBy: { createdAt: 'desc' },
           take: 20,
         });
+
+        // Weight trend sparkline data per user
+        const weightUserIds = [...new Set(weightLogs.map(w => w.userId))];
+        const weightTrendMap = new Map<string, { date: string; weight: number }[]>();
+        if (weightUserIds.length > 0) {
+          const trendData = await db.fitnessWeightLog.findMany({
+            where: { userId: { in: weightUserIds } },
+            select: { userId: true, date: true, weight: true },
+            orderBy: { date: 'asc' },
+          });
+          const byUser: Record<string, { date: string; weight: number }[]> = {};
+          trendData.forEach(t => {
+            if (!byUser[t.userId]) byUser[t.userId] = [];
+            byUser[t.userId].push({ date: t.date, weight: t.weight });
+          });
+          Object.entries(byUser).forEach(([uid, entries]) => {
+            weightTrendMap.set(uid, entries.slice(-7));
+          });
+        }
+
         weightLogs.forEach(w => {
           const goal = goalMap.get(w.userId) || 'maintain';
           const isGaining = goal === 'gain';
           const tags = ['fitness', isGaining ? 'gains' : 'shredding'];
           if (matchTag && matchTag !== 'fitness' && !tags.includes(matchTag)) return;
+
+          const trend = weightTrendMap.get(w.userId) || [];
+          let trendDirection: 'up' | 'down' | 'stable' | 'none' = 'none';
+          if (trend.length >= 2) {
+            const diff = trend[trend.length - 1].weight - trend[0].weight;
+            if (diff > 0.3) trendDirection = 'up';
+            else if (diff < -0.3) trendDirection = 'down';
+            else trendDirection = 'stable';
+          }
+
+          const currentWeight = currentWeightMap.get(w.userId) || null;
           results.push({
             id: w.id,
             type: 'fitness_update',
@@ -185,6 +219,10 @@ export async function GET(req: Request) {
             weight: w.weight,
             date: w.date,
             createdAt: w.createdAt,
+            isOwn: w.userId === session.user.id,
+            trendData: trend,
+            trendDirection,
+            currentWeight,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });
