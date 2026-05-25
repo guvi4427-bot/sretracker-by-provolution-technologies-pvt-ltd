@@ -1,72 +1,28 @@
 ---
 Task ID: 1
 Agent: Main
-Task: Add live content/fitness updates visible to other users in Feed tab with hashtag grouping
+Task: Fix "unable to connect" login error on production S/R/E platform
 
 Work Log:
-- Created new API endpoint `/api/feed/live-updates/route.ts` that fetches other users' content entries, workout logs, and weight logs (respecting privacy settings `isPublic`, `shareContentStatus`, `shareFitnessProgress`)
-- Used `fitnessProfile` lookup to determine goal (gain/maintain) for hashtag assignment (#gains vs #shredding)
-- Modified feed page (`src/app/(main)/feed/page.tsx`):
-  - Added state for `liveContentUpdates`, `liveFitnessUpdates`, `liveWeightUpdates`
-  - Added `fetchLiveUpdates()` function calling the new API
-  - Created `ContentLiveUpdateCard` component showing pipeline progress (same visual as Live tab screenshot)
-  - Created `FitnessLiveUpdateCard` component showing workout/weight details with gains/shredding badges
-  - Built `mergedFeedItems` useMemo that combines regular posts + live updates, sorted by time, grouped by hashtags
-  - Force-grouped special hashtags: #content #progress (purple), #fitness #gains (green), #fitness #shredding (orange)
-  - Live tab KEPT UNTOUCHED as requested
-- Updated discover API (`src/app/api/discover/route.ts`) with `liveupdates` type search
-- Updated discover page (`src/app/(main)/discover/page.tsx`):
-  - Added "Live" tab with Activity icon (green active state)
-  - Added `DiscoverContentCard` and `DiscoverFitnessCard` components
-  - Auto-switches to live tab when hashtag URLs like #content, #fitness, #gains, #shredding are clicked
-- Fixed TypeScript errors (goal field is on FitnessProfile, not Profile model)
-- Built successfully and deployed to Vercel production
+- Diagnosed the login error: Vercel deployment had NO DATABASE_URL environment variable set
+- The .env file contained only a placeholder: `postgresql://placeholder:placeholder@localhost:5432/placeholder`
+- Vercel env vars confirmed empty via API: "No Environment Variables found"
+- Installed Turso CLI but couldn't authenticate (requires browser)
+- Found Neon integration already installed on Vercel (icfg_NpnkpStPEmsgcEb3TXrfWMsU)
+- Created Neon PostgreSQL database via `vercel install neon` CLI command
+- Reverted Prisma schema to `provider = "postgresql"` for Neon compatibility
+- Updated db.ts to support both PostgreSQL (via POSTGRES_PRISMA_URL for pooled connections) and Turso (via libsql adapter)
+- Fixed PrismaLibSql import (lowercase 'l' not 'L') and constructor API (Config object, not Client instance)
+- Set NEXTAUTH_SECRET and NEXTAUTH_URL on Vercel via API
+- Pushed Prisma schema to Neon database successfully
+- Seeded database with admin user (myselfgowtham140707@gmail.com) and 74 achievements
+- Deployed to Vercel production
+- Verified login works: session token returned with correct user data
 
 Stage Summary:
-- New file: `src/app/api/feed/live-updates/route.ts`
-- Modified: `src/app/(main)/feed/page.tsx` (added live update cards + hashtag grouping in Feed tab)
-- Modified: `src/app/(main)/discover/page.tsx` (added Live tab + live update card components)
-- Modified: `src/app/api/discover/route.ts` (added liveupdates search type)
-- All changes are isolated — Live tab unchanged, no other working code affected
-- Deployed to: https://workspace-extract.vercel.app / https://sretracker.vercel.app
-
----
-Task ID: 2
-Agent: Main
-Task: Enhance live content/fitness update cards to be like "live topic sharing" with CTAs, sparkline trends, and real-time refresh
-
-Work Log:
-- Fixed content page `updateLiveStatus()` to dispatch `xp-updated` + `notification-updated` events when live status changes, so feed auto-refreshes
-- Fixed fitness page `addWeight()` to dispatch `xp-updated` + `notification-updated` events when weight is logged
-- Enhanced `/api/feed/live-updates/route.ts`:
-  - Now includes the current user's OWN data (not just other users'), so they see their live status in Feed
-  - Added `isOwn` flag to all response items
-  - Added weight trend sparkline data (last 7 entries per user) via `trendData` field
-  - Added `trendDirection` (up/down/stable/none) calculated from trend data
-  - Added `currentWeight` from fitness profile
-- Enhanced `/api/discover/route.ts` liveupdates section with same improvements (isOwn, trendData, trendDirection, currentWeight)
-- Enhanced Feed page `ContentLiveUpdateCard`:
-  - Added "View Live Status" CTA button (like Shared Topic CTA) — navigates to /content for own, /profile for others
-  - Made avatar and name clickable (navigates to profile)
-  - Added isOwn awareness
-- Enhanced Feed page `FitnessLiveUpdateCard`:
-  - Added mini weight trend sparkline visualization (bar chart using normalized heights)
-  - Added trend direction arrow (up/down/stable)
-  - Added "View Fitness Dashboard" CTA button (like Shared Topic CTA) — navigates to /fitness for own, /profile for others
-  - Added current weight display
-  - Made avatar and name clickable
-  - Added isOwn awareness
-- Applied identical enhancements to Discover page `DiscoverContentCard` and `DiscoverFitnessCard`
-- Fixed TypeScript errors (FitnessProfile has `weight` not `currentWeight`, no `targetWeight` field)
-- Build successful, deployed to production
-
-Stage Summary:
-- Modified: `src/app/(main)/content/page.tsx` (added xp-updated dispatch on live status change)
-- Modified: `src/app/(main)/fitness/page.tsx` (added xp-updated dispatch on weight log)
-- Modified: `src/app/api/feed/live-updates/route.ts` (own data + trend sparkline + isOwn)
-- Modified: `src/app/api/discover/route.ts` (same enhancements for liveupdates)
-- Modified: `src/app/(main)/feed/page.tsx` (CTA buttons + sparkline trends + clickable avatars)
-- Modified: `src/app/(main)/discover/page.tsx` (same card enhancements)
-- Live tab KEPT UNTOUCHED as requested
-- All changes are isolated — no working code broken
-- Deployed to: https://sretracker.vercel.app
+- Root cause: DATABASE_URL was never set on Vercel, causing Prisma to try connecting to localhost:5432
+- Fix: Created free Neon PostgreSQL database via Vercel integration, set all env vars
+- Production URL: https://workspace-extract-pi.vercel.app
+- Login confirmed working with admin credentials
+- Database: Neon PostgreSQL (free tier) at ep-lingering-wildflower-apc6mz0t-pooler.c-7.us-east-1.aws.neon.tech
+- Files modified: prisma/schema.prisma, src/lib/db.ts, .env, scripts/seed-db.mjs, scripts/setup-database.sh
