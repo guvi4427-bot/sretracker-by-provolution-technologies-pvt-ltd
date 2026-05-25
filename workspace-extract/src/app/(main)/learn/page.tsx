@@ -260,7 +260,7 @@ function LearnPageContent() {
           <Button onClick={checkProgress} variant="ghost" className="text-purple-400 border border-purple-500/20"><Sparkles size={14} className="mr-1" />{t('learning.aiProgressCheck')}</Button>
           {aiProgress && <GlassCard className="p-4"><p className={`text-sm ${aiProgress.shouldWarn ? 'text-amber-400' : 'text-green-400'}`}>{aiProgress.message}</p></GlassCard>}
           {/* Ad after overview stats */}
-          <AdCard format="horizontal" slot="learn_overview" />
+          <AdCard format="in-feed" slot="learn_overview" />
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-4 mt-4">

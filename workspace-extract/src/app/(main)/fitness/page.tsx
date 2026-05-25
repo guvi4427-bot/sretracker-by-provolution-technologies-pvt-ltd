@@ -734,11 +734,6 @@ export default function FitnessPage() {
           })()}
         </TabsContent>
 
-        {/* Ad — subtle separator between overview and nutrition */}
-        <div className="py-2">
-          <AdCard format="horizontal" slot="fitness_mid" />
-        </div>
-
         {/* Nutrition */}
         <TabsContent value="nutrition" className="space-y-4 mt-4">
 
@@ -1290,6 +1285,11 @@ export default function FitnessPage() {
             <div className="flex gap-2"><Input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder={t('ai.askAnything')} className="bg-accent border-border text-foreground" /><Button onClick={sendChat} className="gradient-blue shrink-0" disabled={chatLoading}><Send size={16} /></Button></div>
           </GlassCard>
         </TabsContent>
+
+        {/* Ad — at the very bottom of all tab content */}
+        <div className="pt-4">
+          <AdCard format="in-feed" slot="fitness_bottom" />
+        </div>
       </Tabs>
     </div>
   );

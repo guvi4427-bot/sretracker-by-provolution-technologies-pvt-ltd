@@ -124,7 +124,7 @@ export default function HomePage() {
       </div>
 
       {/* Ad Banner — between stats and daily quests */}
-      <AdCard format="horizontal" slot="home_mid" />
+      <AdCard format="in-feed" slot="home_mid" />
 
       {(quests.length > 0 || true) && (
         <div>
