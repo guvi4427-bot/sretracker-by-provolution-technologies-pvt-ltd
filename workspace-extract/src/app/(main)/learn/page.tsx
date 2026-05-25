@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { BookOpen, Plus, Trash2, Sparkles, Send, Bot, Loader2, Globe, Lock, Eye, Share2, X, Users, ChevronRight, Clock, Calendar, MessageCircle, Search } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Sparkles, Send, Bot, Loader2, Globe, Lock, Eye, Share2, X, Users, ChevronRight, Clock, Calendar, MessageCircle, Search, Filter } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { AdCard } from '@/components/ad-banner';
 import { SelectPill } from '@/components/select-pill';
@@ -24,8 +24,9 @@ function LearnPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const topicParam = searchParams.get('topicId');
+  const tabParam = searchParams.get('tab');
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(tabParam && TABS_LIST.includes(tabParam) ? tabParam : 'overview');
   const [topics, setTopics] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -53,12 +54,18 @@ function LearnPageContent() {
   const [dmSearchResults, setDmSearchResults] = useState<any[]>([]);
   const [sharingDMConvId, setSharingDMConvId] = useState<string|null>(null);
   const [topicLoading, setTopicLoading] = useState(false);
+  const [filterDate, setFilterDate] = useState('');
 
   const fetchTopics = useCallback(async () => { try { const r = await fetch('/api/learning/topic'); if (r.ok) { const d = await r.json(); setTopics(Array.isArray(d) ? d : d.topics || []); } } catch {} }, []);
   const fetchEntries = useCallback(async () => { try { const r = await fetch('/api/learning/entries'); if (r.ok) { const d = await r.json(); setEntries(Array.isArray(d) ? d : d.entries || []); } } catch {} }, []);
   const fetchStats = useCallback(async () => { try { const r = await fetch('/api/learning/stats'); if (r.ok) setStats(await r.json()); } catch {} }, []);
 
   useEffect(() => { fetchTopics(); fetchEntries(); fetchStats(); }, [fetchTopics, fetchEntries, fetchStats]);
+
+  // Client-side inactivity check: triggers server-side notification creation for 21-day inactive topics
+  useEffect(() => {
+    fetch('/api/cron/learning-inactivity', { method: 'GET' }).catch(() => {});
+  }, []);
 
   // Auto-open topic from URL param ?topicId=xxx
   useEffect(() => {
@@ -302,18 +309,65 @@ function LearnPageContent() {
               <Button onClick={createEntry} className="gradient-blue w-full">{t('common.submit')}</Button>
             </div>
           </GlassCard>
-          <div className="space-y-2">{entries.slice(0, 15).map((e: any) => (
-            <GlassCard key={e.id} variant="default" className="p-3 flex items-center justify-between cursor-pointer hover:border-blue-500/20 transition-all group" onClick={() => router.push(`/learn/entry/${e.id}?from=learn`)}>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground group-hover:text-blue-300 transition-colors">{e.title}</p>
-                <p className="text-[10px] text-muted-foreground/70">{e.topic?.name && <span className="text-blue-400/60">{e.topic.name} · </span>}{e.duration ? `${e.duration}min · ` : ''}{e.date}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="text-muted-foreground/30 hover:text-red-400 p-1"><Trash2 size={12} /></button>
-                <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-blue-400" />
-              </div>
-            </GlassCard>
-          ))}</div>
+
+          {/* Date Filter & Entries Grouped by Date */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-muted-foreground/60" />
+              <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} placeholder="Filter by date" className="bg-accent border-border text-foreground text-sm max-w-[200px]" />
+              {filterDate && (
+                <button onClick={() => setFilterDate('')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
+              )}
+            </div>
+
+            {/* Group entries by date */}
+            {(() => {
+              const filteredEntries = filterDate
+                ? entries.filter((e: any) => e.date === filterDate)
+                : entries;
+
+              const groupedByDate: Record<string, any[]> = {};
+              filteredEntries.slice(0, 30).forEach((e: any) => {
+                const dateKey = e.date || 'Unknown';
+                if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+                groupedByDate[dateKey].push(e);
+              });
+
+              const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+
+              if (sortedDates.length === 0) {
+                return (
+                  <GlassCard className="p-6 text-center">
+                    <Calendar className="w-6 h-6 mx-auto mb-2 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground/60">{filterDate ? 'No entries found for this date' : 'No entries yet. Log your first entry above!'}</p>
+                  </GlassCard>
+                );
+              }
+
+              return sortedDates.map(dateKey => (
+                <div key={dateKey} className="space-y-2">
+                  <div className="flex items-center gap-2 pt-1">
+                    <Calendar size={12} className="text-blue-400/60" />
+                    <h4 className="text-xs font-medium text-muted-foreground/80">{dateKey}</h4>
+                    <span className="text-[9px] text-muted-foreground/40">({groupedByDate[dateKey].length} entr{groupedByDate[dateKey].length !== 1 ? 'ies' : 'y'})</span>
+                    <div className="flex-1 h-px bg-border/30" />
+                  </div>
+                  {groupedByDate[dateKey].map((e: any) => (
+                    <GlassCard key={e.id} variant="default" className="p-3 flex items-center justify-between cursor-pointer hover:border-blue-500/20 transition-all group" onClick={() => router.push(`/learn/entry/${e.id}?from=learn`)}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground group-hover:text-blue-300 transition-colors">{e.title}</p>
+                        <p className="text-[10px] text-muted-foreground/70">{e.topic?.name && <span className="text-blue-400/60">{e.topic.name} · </span>}{e.duration ? `${e.duration}min` : ''}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="text-muted-foreground/30 hover:text-red-400 p-1"><Trash2 size={12} /></button>
+                        <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-blue-400" />
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              ));
+            })()}
+          </div>
         </TabsContent>
 
         <TabsContent value="aiTutor" className="space-y-4 mt-4">

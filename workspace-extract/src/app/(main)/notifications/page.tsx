@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, MessageCircle, Users, Heart, Repeat2, UserPlus, AtSign, FileText, Check, Award, Trash2, X, Shield, Bookmark } from 'lucide-react';
+import { Trophy, MessageCircle, Users, Heart, Repeat2, UserPlus, AtSign, FileText, Check, Award, Trash2, X, Shield, Bookmark, RefreshCw } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { Button } from '@/components/ui/button';
 import { t } from '@/lib/i18n';
@@ -27,6 +27,7 @@ const NOTIFICATION_CONFIG: Record<string, { icon: any; color: string; getPath: (
   system: { icon: FileText, color: 'text-muted-foreground', getPath: () => '' },
   mention: { icon: AtSign, color: 'text-purple-400', getPath: (d) => `/feed?postId=${d?.postId}` },
   quest: { icon: Trophy, color: 'text-green-400', getPath: () => '/home' },
+  topic_switch_recommendation: { icon: RefreshCw, color: 'text-orange-400', getPath: () => '/learn?tab=topics' },
 };
 
 export default function NotificationsPage() {
