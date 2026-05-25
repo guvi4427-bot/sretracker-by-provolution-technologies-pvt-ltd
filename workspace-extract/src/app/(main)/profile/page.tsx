@@ -50,12 +50,15 @@ export default function ProfilePage() {
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
-  useEffect(() => {
+  // Initialize edit fields only when editing mode is entered (not on every profile change)
+  // This prevents AppShell's 5s fetchProfile interval from wiping user input
+  const startEditing = useCallback(() => {
     if (profile) {
       setEditName(profile.name || '');
       setEditBio(profile.bio || '');
       setEditPhone(profile.phone || '');
     }
+    setEditing(true);
   }, [profile]);
 
   const fetchCounts = useCallback(async () => {
@@ -259,7 +262,7 @@ export default function ProfilePage() {
               {editing ? (
                 <Button onClick={saveProfile} size="sm" className="gradient-blue"><Save size={14} /></Button>
               ) : (
-                <Button onClick={() => setEditing(true)} size="sm" variant="ghost" className="text-muted-foreground"><Edit size={14} /></Button>
+                <Button onClick={startEditing} size="sm" variant="ghost" className="text-muted-foreground"><Edit size={14} /></Button>
               )}
             </div>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
