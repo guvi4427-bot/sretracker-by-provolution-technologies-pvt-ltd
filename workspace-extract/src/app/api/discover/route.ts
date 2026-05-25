@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     if (type === 'posts') {
       const posts = await db.post.findMany({
         where: {
-          ...(q ? { content: { contains: q } } : {}),
+          ...(q ? { content: { contains: q, mode: 'insensitive' } } : {}),
         },
         take: 20, orderBy: { createdAt: 'desc' },
         include: {
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       const profiles = await db.profile.findMany({
         where: {
           userId: { not: session.user.id },
-          ...(q ? { OR: [{ name: { contains: q } }, { user: { username: { contains: q } } }] } : {}),
+          ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { user: { username: { contains: q, mode: 'insensitive' } } }] } : {}),
           isPublic: true,
         },
         take: 20, orderBy: { xp: 'desc' },
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
 
     if (type === 'groups') {
       const groups = await db.groupChat.findMany({
-        where: { isPublic: true, ...(q ? { name: { contains: q } } : {}) },
+        where: { isPublic: true, ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}) },
         take: 20, orderBy: { createdAt: 'desc' },
         include: { _count: { select: { members: true } } },
       });
@@ -68,7 +68,7 @@ export async function GET(req: Request) {
 
     if (type === 'topics') {
       const topics = await db.learningTopic.findMany({
-        where: { isSharedCollection: true, ...(q ? { name: { contains: q } } : {}) },
+        where: { isSharedCollection: true, ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}) },
         take: 20, orderBy: { sharedAt: 'desc' },
         include: {
           _count: { select: { entries: true } },

@@ -258,8 +258,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       {/* Page Content */}
       <main className="flex-1 p-4 pb-28">
         <ErrorBoundary>
-          <AnimatePresence mode="wait">
-            <motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
+          <AnimatePresence mode="popLayout">
+            <motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15, ease: 'easeOut' }}>
               {children}
             </motion.div>
           </AnimatePresence>

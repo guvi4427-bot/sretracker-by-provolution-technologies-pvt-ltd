@@ -26,13 +26,39 @@ const phaseConfig: Record<string, { icon: any; color: string; bg: string; nameKe
   explore: { icon: Star, color: 'text-purple-400', bg: 'bg-purple-600/20', nameKey: 'phase.explore' },
 };
 
+// Session storage key for persisting edit state across remounts
+const EDIT_STORAGE_KEY = 'sre_profile_edit';
+
+function restoreEditState(): { editing: boolean; name: string; bio: string; phone: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(EDIT_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function persistEditState(state: { editing: boolean; name: string; bio: string; phone: string }) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (state.editing) {
+      sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(state));
+    } else {
+      sessionStorage.removeItem(EDIT_STORAGE_KEY);
+    }
+  } catch {}
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { profile, fetchProfile } = useUserStore();
-  const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editBio, setEditBio] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+
+  // Restore editing state from sessionStorage if component remounted mid-edit
+  const savedEdit = restoreEditState();
+  const [editing, setEditing] = useState(savedEdit?.editing || false);
+  const [editName, setEditName] = useState(savedEdit?.name || '');
+  const [editBio, setEditBio] = useState(savedEdit?.bio || '');
+  const [editPhone, setEditPhone] = useState(savedEdit?.phone || '');
   const [achievements, setAchievements] = useState<any[]>([]);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [showFollowers, setShowFollowers] = useState(true);
@@ -57,9 +83,26 @@ export default function ProfilePage() {
       setEditName(profile.name || '');
       setEditBio(profile.bio || '');
       setEditPhone(profile.phone || '');
+      persistEditState({ editing: true, name: profile.name || '', bio: profile.bio || '', phone: profile.phone || '' });
     }
     setEditing(true);
   }, [profile]);
+
+  // Persist edit state changes while editing
+  const updateEditName = useCallback((val: string) => {
+    setEditName(val);
+    persistEditState({ editing: true, name: val, bio: editBio, phone: editPhone });
+  }, [editBio, editPhone]);
+
+  const updateEditBio = useCallback((val: string) => {
+    setEditBio(val);
+    persistEditState({ editing: true, name: editName, bio: val, phone: editPhone });
+  }, [editName, editPhone]);
+
+  const updateEditPhone = useCallback((val: string) => {
+    setEditPhone(val);
+    persistEditState({ editing: true, name: editName, bio: editBio, phone: val });
+  }, [editName, editBio]);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -121,7 +164,7 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName, bio: editBio, phone: editPhone || null }),
       });
-      if (r.ok) { setEditing(false); fetchProfile(); toast.success(t('common.success')); }
+      if (r.ok) { setEditing(false); persistEditState({ editing: false, name: '', bio: '', phone: '' }); fetchProfile(); toast.success(t('common.success')); }
       else { const d = await r.json().catch(() => ({})); toast.error(d.error || 'Failed to save profile'); }
     } catch { toast.error('Network error. Please try again.'); }
   }
@@ -253,7 +296,7 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {editing ? (
-                <Input value={editName} onChange={e => setEditName(e.target.value)} className="bg-white/5 border-white/10 text-foreground max-w-[200px]" />
+                <Input value={editName} onChange={e => updateEditName(e.target.value)} className="bg-white/5 border-white/10 text-foreground max-w-[200px]" />
               ) : (
                 <h2 className="text-xl font-bold text-foreground">{profile.name || 'User'}</h2>
               )}
@@ -267,14 +310,14 @@ export default function ProfilePage() {
             </div>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
             {editing ? (
-              <Textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="bg-white/5 border-white/10 text-foreground mt-2 text-sm" rows={2} />
+              <Textarea value={editBio} onChange={e => updateEditBio(e.target.value)} className="bg-white/5 border-white/10 text-foreground mt-2 text-sm" rows={2} />
             ) : (
               <p className="text-sm text-muted-foreground mt-1">{profile.bio || 'No bio'}</p>
             )}
             {editing ? (
               <div className="flex items-center gap-2 mt-2">
                 <Phone size={14} className="text-muted-foreground shrink-0" />
-                <Input type="tel" placeholder="+91 9876543210" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="bg-white/5 border-white/10 text-foreground text-sm h-8" />
+                <Input type="tel" placeholder="+91 9876543210" value={editPhone} onChange={e => updateEditPhone(e.target.value)} className="bg-white/5 border-white/10 text-foreground text-sm h-8" />
                 <span className="text-[9px] text-muted-foreground/40 flex items-center gap-0.5 shrink-0"><ShieldCheck size={9} />{t('profile.phoneAdminOnly')}</span>
               </div>
             ) : (

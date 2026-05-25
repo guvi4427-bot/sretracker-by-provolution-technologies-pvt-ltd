@@ -36,15 +36,15 @@ export async function GET(req: Request) {
     const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
     // ── Learning Updates (shared learning topics) ──
+    // Always include own data + public users' data
     const learningWhere: any = {
       isSharedCollection: true,
-      user: {
-        profile: {
-          isPublic: true,
-        },
-      },
+      OR: [
+        { userId: myUserId }, // Always include own
+        { user: { profile: { isPublic: true } } }, // Public users
+      ],
     };
-    if (!includeOwn) learningWhere.userId = { not: myUserId };
+    if (!includeOwn) learningWhere.OR = learningWhere.OR.filter((c: any) => !c.userId);
 
     const sharedTopics = await db.learningTopic.findMany({
       where: learningWhere,
@@ -83,15 +83,14 @@ export async function GET(req: Request) {
     }));
 
     // ── Content Updates ──
-    // Only require isPublic: true (not shareContentStatus, which defaults to false and blocks all data)
+    // Always include own data + public users' data
     const contentWhere: any = {
-      user: {
-        profile: {
-          isPublic: true,
-        },
-      },
+      OR: [
+        { userId: myUserId }, // Always include own
+        { user: { profile: { isPublic: true } } }, // Public users
+      ],
     };
-    if (!includeOwn) contentWhere.userId = { not: myUserId };
+    if (!includeOwn) contentWhere.OR = contentWhere.OR.filter((c: any) => !c.userId);
 
     const contentEntries = await db.contentEntry.findMany({
       where: contentWhere,
@@ -132,16 +131,15 @@ export async function GET(req: Request) {
     }));
 
     // ── Fitness Updates (Workouts) ──
-    // Only require isPublic: true (not shareFitnessProgress, which defaults to false and blocks all data)
+    // Always include own data + public users' data
     const fitnessWhere: any = {
-      user: {
-        profile: {
-          isPublic: true,
-        },
-      },
       createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      OR: [
+        { userId: myUserId }, // Always include own
+        { user: { profile: { isPublic: true } } }, // Public users
+      ],
     };
-    if (!includeOwn) fitnessWhere.userId = { not: myUserId };
+    if (!includeOwn) fitnessWhere.OR = fitnessWhere.OR.filter((c: any) => !c.userId);
 
     const recentWorkouts = await db.fitnessWorkoutLog.findMany({
       where: fitnessWhere,
@@ -188,15 +186,15 @@ export async function GET(req: Request) {
     });
 
     // ── Weight Updates ──
+    // Always include own data + public users' data
     const weightWhere: any = {
-      user: {
-        profile: {
-          isPublic: true,
-        },
-      },
       createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      OR: [
+        { userId: myUserId }, // Always include own
+        { user: { profile: { isPublic: true } } }, // Public users
+      ],
     };
-    if (!includeOwn) weightWhere.userId = { not: myUserId };
+    if (!includeOwn) weightWhere.OR = weightWhere.OR.filter((c: any) => !c.userId);
 
     const recentWeightLogs = await db.fitnessWeightLog.findMany({
       where: weightWhere,

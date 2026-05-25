@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check } from 'lucide-react';
@@ -78,12 +78,15 @@ export default function DiscoverPage() {
   const [liveLearningUpdates, setLiveLearningUpdates] = useState<any[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
 
-  const search = useCallback(async (type?: string) => {
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const search = useCallback(async (type?: string, searchQuery?: string) => {
     const tab = type || activeTab;
-    if (!query.trim() && tab !== 'groups' && tab !== 'topics') { setResults({ posts: [], topics: [], groups: [], users: [] }); return; }
+    const q = searchQuery ?? query;
+    if (!q.trim() && tab !== 'groups' && tab !== 'topics') { setResults({ posts: [], topics: [], groups: [], users: [] }); return; }
     setLoading(true);
     try {
-      const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(query.toLowerCase())}`);
+      const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(q.toLowerCase())}`);
       if (r.ok) {
         const d = await r.json();
         const items = Array.isArray(d) ? d : (d[tab] || []);
@@ -115,7 +118,14 @@ export default function DiscoverPage() {
     return () => { window.removeEventListener('xp-updated', handler); };
   }, [fetchLiveUpdates]);
 
-  useEffect(() => { if (activeTab === 'groups' || activeTab === 'topics' || query.trim()) search(); }, [activeTab, search]);
+  // Debounced search: auto-search when query or tab changes (300ms delay)
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (activeTab === 'groups' || activeTab === 'topics' || query.trim()) {
+      searchTimerRef.current = setTimeout(() => { search(); }, 300);
+    }
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [activeTab, query, search]);
 
   // Handle URL query param
   useEffect(() => {

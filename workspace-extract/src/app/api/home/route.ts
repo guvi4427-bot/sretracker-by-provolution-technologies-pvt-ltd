@@ -149,7 +149,7 @@ export async function GET() {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     const isActiveToday = profile?.lastActiveDate === today;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       profile: profile
         ? {
             name: profile.name,
@@ -175,6 +175,9 @@ export async function GET() {
         lastActiveDate: profile?.lastActiveDate || null,
       },
     });
+    // Prevent browser/CDN caching so achievement count is always fresh
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return response;
   } catch (error) {
     console.error('Home API error:', error);
     return NextResponse.json({ error: 'Failed to load dashboard' }, { status: 500 });
