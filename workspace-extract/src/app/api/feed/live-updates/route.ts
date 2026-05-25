@@ -6,11 +6,12 @@ import { db } from '@/lib/db';
 /**
  * GET /api/feed/live-updates
  *
- * Fetches live content & fitness updates from ALL public users
- * (now INCLUDING the logged-in user's own data, so they can see
- * their live status in the Feed tab alongside other users').
+ * Fetches live content, fitness & learning updates from ALL public users
+ * (INCLUDING the logged-in user's own data, so they can see
+ * their live status in the Feed/Discover tabs alongside other users').
  *
- * Returns three arrays:
+ * Returns four arrays:
+ *  - learningUpdates: shared learning topics with entry counts
  *  - contentUpdates: ContentEntry records with user info + pipeline data
  *  - fitnessUpdates: recent workouts with user info
  *  - weightUpdates: recent weight logs with user info + trend sparkline data
@@ -34,12 +35,59 @@ export async function GET(req: Request) {
     const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
     const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
+    // ── Learning Updates (shared learning topics) ──
+    const learningWhere: any = {
+      isSharedCollection: true,
+      user: {
+        profile: {
+          isPublic: true,
+        },
+      },
+    };
+    if (!includeOwn) learningWhere.userId = { not: myUserId };
+
+    const sharedTopics = await db.learningTopic.findMany({
+      where: learningWhere,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            profile: { select: { name: true, avatarUrl: true, verified: true } },
+          },
+        },
+        _count: { select: { entries: true } },
+      },
+      orderBy: { sharedAt: 'desc' },
+      take: limit,
+    });
+
+    const learningUpdates = sharedTopics.map(t => ({
+      id: t.id,
+      type: 'learning' as const,
+      name: t.name,
+      phase: t.phase,
+      entryCount: t._count.entries,
+      sharedAt: t.sharedAt,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      isOwn: t.userId === myUserId,
+      user: {
+        id: t.user.id,
+        username: t.user.username,
+        name: t.user.profile?.name || t.user.username,
+        avatarUrl: t.user.profile?.avatarUrl,
+        verified: t.user.profile?.verified || false,
+      },
+      hashtags: ['learning', t.phase || 'study'],
+    }));
+
     // ── Content Updates ──
+    // Only require isPublic: true (not shareContentStatus, which defaults to false and blocks all data)
     const contentWhere: any = {
       user: {
         profile: {
           isPublic: true,
-          shareContentStatus: true,
         },
       },
     };
@@ -84,11 +132,11 @@ export async function GET(req: Request) {
     }));
 
     // ── Fitness Updates (Workouts) ──
+    // Only require isPublic: true (not shareFitnessProgress, which defaults to false and blocks all data)
     const fitnessWhere: any = {
       user: {
         profile: {
           isPublic: true,
-          shareFitnessProgress: true,
         },
       },
       createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
@@ -144,7 +192,6 @@ export async function GET(req: Request) {
       user: {
         profile: {
           isPublic: true,
-          shareFitnessProgress: true,
         },
       },
       createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
@@ -167,7 +214,6 @@ export async function GET(req: Request) {
     });
 
     // ── Weight trend sparkline data per user ──
-    // Collect unique user IDs from weight logs
     const weightUserIds = [...new Set(recentWeightLogs.map(w => w.userId))];
     const weightTrendMap = new Map<string, { date: string; weight: number }[]>();
 
@@ -180,7 +226,6 @@ export async function GET(req: Request) {
         orderBy: { date: 'asc' },
       });
 
-      // Group by user, take last 7 entries
       const byUser: Record<string, { date: string; weight: number }[]> = {};
       trendData.forEach(t => {
         if (!byUser[t.userId]) byUser[t.userId] = [];
@@ -196,7 +241,6 @@ export async function GET(req: Request) {
       const isGaining = goal === 'gain';
       const trend = weightTrendMap.get(w.userId) || [];
 
-      // Calculate weight change direction from trend
       let trendDirection: 'up' | 'down' | 'stable' | 'none' = 'none';
       if (trend.length >= 2) {
         const diff = trend[trend.length - 1].weight - trend[0].weight;
@@ -231,6 +275,7 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({
+      learningUpdates,
       contentUpdates,
       fitnessUpdates,
       weightUpdates,

@@ -112,6 +112,7 @@ export default function FeedPage() {
   const [liveContentUpdates, setLiveContentUpdates] = useState<any[]>([]);
   const [liveFitnessUpdates, setLiveFitnessUpdates] = useState<any[]>([]);
   const [liveWeightUpdates, setLiveWeightUpdates] = useState<any[]>([]);
+  const [liveLearningUpdates, setLiveLearningUpdates] = useState<any[]>([]);
 
   const fetchPosts = useCallback(async (showSkeleton = false) => {
     if (abortRef.current) abortRef.current.abort();
@@ -153,6 +154,7 @@ export default function FeedPage() {
         setLiveContentUpdates(d.contentUpdates || []);
         setLiveFitnessUpdates(d.fitnessUpdates || []);
         setLiveWeightUpdates(d.weightUpdates || []);
+        setLiveLearningUpdates(d.learningUpdates || []);
       }
     } catch {}
   }, []);
@@ -424,12 +426,92 @@ export default function FeedPage() {
     );
   }
 
+  // ── Learning Live Update Card ──
+  function LearningLiveUpdateCard({ update }: { update: any }) {
+    const isOwn = update.isOwn;
+    const phase = update.phase;
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0 cursor-pointer" onClick={() => router.push(`/profile/${update.user?.id}`)}>
+            <AvatarFallback className="bg-cyan-600/30 text-cyan-300 text-xs">{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => router.push(`/profile/${update.user?.id}`)}>{update.user?.name || 'User'} {update.user?.verified && <span className="text-blue-400">✓</span>}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+
+            {/* Learning card with topic info */}
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-cyan-600/20 text-cyan-400">
+                  <BookOpen size={12} /> Learning
+                </span>
+                <p className="text-sm font-medium text-foreground truncate">{update.name}</p>
+              </div>
+
+              {/* Topic stats row */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <BookOpen size={12} className="text-cyan-400" />
+                  <span className="text-xs text-foreground font-medium">{update.entryCount || 0} entries</span>
+                </div>
+                {phase && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 font-medium">
+                    {phase.charAt(0).toUpperCase() + phase.slice(1)} Phase
+                  </span>
+                )}
+                {update.sharedAt && (
+                  <span className="text-[10px] text-muted-foreground/50">
+                    Shared {new Date(update.sharedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* View Shared Collection CTA */}
+            <div className="mt-2">
+              <button
+                onClick={() => router.push(`/shared-topic/${update.id}?from=feed`)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-cyan-600/10 hover:bg-cyan-600/15 border border-cyan-500/20 transition-colors group"
+              >
+                <Globe size={14} className="text-cyan-400 shrink-0" />
+                <span className="text-xs text-cyan-300 font-medium flex-1 text-left">
+                  View Shared Collection
+                </span>
+                <Sparkles size={10} className="text-amber-400/50 group-hover:text-amber-400 transition-colors" />
+                <ChevronRight size={14} className="text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+
+            {/* Hashtag pills */}
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span
+                  key={tag}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 cursor-pointer hover:bg-cyan-600/25 transition-colors"
+                  onClick={() => router.push(`/discover?q=${encodeURIComponent('#' + tag)}`)}
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
   // ── Build merged feed: posts + live updates, sorted by time, grouped by hashtags ──
   const mergedFeedItems = useMemo(() => {
     type FeedItem = {
       id: string;
       sortTime: number;
-      type: 'post' | 'content_update' | 'fitness_update';
+      type: 'post' | 'content_update' | 'fitness_update' | 'learning_update';
       hashtags: string[];
       data: any;
     };
@@ -474,6 +556,17 @@ export default function FeedPage() {
       });
     });
 
+    // Add learning live updates
+    liveLearningUpdates.forEach((u: any) => {
+      items.push({
+        id: `learning-${u.id}`,
+        sortTime: new Date(u.sharedAt || u.updatedAt || u.createdAt).getTime(),
+        type: 'learning_update',
+        hashtags: u.hashtags || ['learning', 'study'],
+        data: u,
+      });
+    });
+
     // Add weight updates
     liveWeightUpdates.forEach((u: any) => {
       items.push({
@@ -490,7 +583,7 @@ export default function FeedPage() {
 
     // ── Hashtag grouping ──
     // Always force-group these special tags
-    const FORCE_GROUP_TAGS = ['content', 'progress', 'fitness', 'gains', 'shredding'];
+    const FORCE_GROUP_TAGS = ['content', 'progress', 'fitness', 'gains', 'shredding', 'learning', 'study'];
 
     const tagCount: Record<string, number> = {};
     items.forEach(item => {
@@ -517,14 +610,14 @@ export default function FeedPage() {
     });
 
     // Define section order for grouped tags (live updates first)
-    const groupOrder = ['content', 'progress', 'fitness', 'gains', 'shredding'];
+    const groupOrder = ['learning', 'content', 'progress', 'fitness', 'gains', 'shredding'];
     const orderedGroups = Object.entries(grouped).sort(([a], [b]) => {
       const ai = groupOrder.indexOf(a); const bi = groupOrder.indexOf(b);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
 
     return { orderedGroups, ungrouped };
-  }, [posts, liveContentUpdates, liveFitnessUpdates, liveWeightUpdates]);
+  }, [posts, liveContentUpdates, liveFitnessUpdates, liveWeightUpdates, liveLearningUpdates]);
 
   // Legacy hashtag grouping for backward compat (still used by trending header text)
   const { grouped, ungrouped } = useMemo(() => {
@@ -790,11 +883,12 @@ export default function FeedPage() {
       {/* ═══ LIVE UPDATE SECTIONS (grouped by hashtags) ═══ */}
       {mergedFeedItems.orderedGroups.map(([tag, items]) => {
         const isContentTag = tag === 'content' || tag === 'progress';
+        const isLearningTag = tag === 'learning' || tag === 'study';
         const isFitnessTag = tag === 'fitness' || tag === 'gains' || tag === 'shredding';
         const isGainsTag = tag === 'gains';
         const isShredTag = tag === 'shredding';
-        const headerIcon = isContentTag ? <Video size={14} className="text-purple-400" /> : isFitnessTag ? <Dumbbell size={14} className={isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400'} /> : <Rss size={14} className="text-blue-400" />;
-        const headerColor = isContentTag ? 'text-purple-400' : isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400';
+        const headerIcon = isLearningTag ? <BookOpen size={14} className="text-cyan-400" /> : isContentTag ? <Video size={14} className="text-purple-400" /> : isFitnessTag ? <Dumbbell size={14} className={isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400'} /> : <Rss size={14} className="text-blue-400" />;
+        const headerColor = isLearningTag ? 'text-cyan-400' : isContentTag ? 'text-purple-400' : isGainsTag ? 'text-green-400' : isShredTag ? 'text-orange-400' : 'text-blue-400';
 
         return (
           <div key={tag}>
@@ -808,6 +902,7 @@ export default function FeedPage() {
               {items.map((item: any) => {
                 if (item.type === 'content_update') return <ContentLiveUpdateCard key={item.id} update={item.data} />;
                 if (item.type === 'fitness_update') return <FitnessLiveUpdateCard key={item.id} update={item.data} />;
+                if (item.type === 'learning_update') return <LearningLiveUpdateCard key={item.id} update={item.data} />;
                 return <PostCard key={item.id} post={item.data} />;
               })}
             </div>
@@ -821,12 +916,13 @@ export default function FeedPage() {
           {mergedFeedItems.ungrouped.map((item: any) => {
             if (item.type === 'content_update') return <ContentLiveUpdateCard key={item.id} update={item.data} />;
             if (item.type === 'fitness_update') return <FitnessLiveUpdateCard key={item.id} update={item.data} />;
+            if (item.type === 'learning_update') return <LearningLiveUpdateCard key={item.id} update={item.data} />;
             return <PostCard key={item.id} post={item.data} />;
           })}
         </div>
       )}
 
-      {posts.length === 0 && liveContentUpdates.length === 0 && liveFitnessUpdates.length === 0 && liveWeightUpdates.length === 0 && !loading && (
+      {posts.length === 0 && liveContentUpdates.length === 0 && liveFitnessUpdates.length === 0 && liveWeightUpdates.length === 0 && liveLearningUpdates.length === 0 && !loading && (
         <GlassCard className="p-8 text-center">
           <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
         </GlassCard>

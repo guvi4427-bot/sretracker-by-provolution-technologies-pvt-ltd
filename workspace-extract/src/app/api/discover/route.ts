@@ -97,11 +97,42 @@ export async function GET(req: Request) {
 
       const results: any[] = [];
 
+      // Learning updates — shared learning topics
+      if (!matchTag || matchTag === 'learning' || matchTag === 'study') {
+        const sharedTopics = await db.learningTopic.findMany({
+          where: {
+            isSharedCollection: true,
+            user: { profile: { isPublic: true } },
+          },
+          include: {
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            _count: { select: { entries: true } },
+          },
+          orderBy: { sharedAt: 'desc' },
+          take: 20,
+        });
+        sharedTopics.forEach(t => {
+          results.push({
+            id: t.id,
+            type: 'learning_update',
+            name: t.name,
+            phase: t.phase,
+            entryCount: t._count.entries,
+            sharedAt: t.sharedAt,
+            updatedAt: t.updatedAt,
+            createdAt: t.createdAt,
+            isOwn: t.userId === session.user.id,
+            user: { id: t.user.id, username: t.user.username, name: t.user.profile?.name || t.user.username, avatarUrl: t.user.profile?.avatarUrl, verified: t.user.profile?.verified || false },
+            hashtags: ['learning', t.phase || 'study'],
+          });
+        });
+      }
+
       // Content updates — filtered by hashtag if query matches
       if (!matchTag || matchTag === 'content' || matchTag === 'progress') {
         const contentEntries = await db.contentEntry.findMany({
           where: {
-            user: { profile: { isPublic: true, shareContentStatus: true } },
+            user: { profile: { isPublic: true } },
           },
           include: {
             user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
@@ -132,7 +163,7 @@ export async function GET(req: Request) {
       if (!matchTag || matchTag === 'fitness' || matchTag === 'gains' || matchTag === 'shredding') {
         const workouts = await db.fitnessWorkoutLog.findMany({
           where: {
-            user: { profile: { isPublic: true, shareFitnessProgress: true } },
+            user: { profile: { isPublic: true } },
             createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
           },
           include: {
@@ -167,7 +198,7 @@ export async function GET(req: Request) {
 
         const weightLogs = await db.fitnessWeightLog.findMany({
           where: {
-            user: { profile: { isPublic: true, shareFitnessProgress: true } },
+            user: { profile: { isPublic: true } },
             createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
           },
           include: {

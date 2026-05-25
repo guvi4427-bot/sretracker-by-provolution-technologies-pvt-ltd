@@ -75,6 +75,7 @@ export default function DiscoverPage() {
   const [liveContentUpdates, setLiveContentUpdates] = useState<any[]>([]);
   const [liveFitnessUpdates, setLiveFitnessUpdates] = useState<any[]>([]);
   const [liveWeightUpdates, setLiveWeightUpdates] = useState<any[]>([]);
+  const [liveLearningUpdates, setLiveLearningUpdates] = useState<any[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
 
   const search = useCallback(async (type?: string) => {
@@ -100,6 +101,7 @@ export default function DiscoverPage() {
         setLiveContentUpdates(d.contentUpdates || []);
         setLiveFitnessUpdates(d.fitnessUpdates || []);
         setLiveWeightUpdates(d.weightUpdates || []);
+        setLiveLearningUpdates(d.learningUpdates || []);
       }
     } catch {} finally { setLiveLoading(false); }
   }, []);
@@ -373,11 +375,85 @@ export default function DiscoverPage() {
     );
   }
 
+  // ── Learning Live Update Card ──
+  function DiscoverLearningCard({ update }: { update: any }) {
+    const isOwn = update.isOwn;
+    const phase = update.phase;
+
+    return (
+      <GlassCard className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 border border-border shrink-0 cursor-pointer" onClick={() => router.push(`/profile/${update.user?.id}`)}>
+            <AvatarFallback className="bg-cyan-600/30 text-cyan-300 text-xs">{update.user?.name?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-foreground cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => router.push(`/profile/${update.user?.id}`)}>{update.user?.name || 'User'} {update.user?.verified && <BadgeCheck size={12} className="text-blue-400 inline" />}</p>
+              <p className="text-[10px] text-muted-foreground/70">@{update.user?.username || 'user'}</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+              <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+            </div>
+
+            {/* Learning card with topic info */}
+            <div className="bg-accent/50 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-cyan-600/20 text-cyan-400">
+                  <BookOpen size={12} /> Learning
+                </span>
+                <p className="text-sm font-medium text-foreground truncate">{update.name}</p>
+              </div>
+
+              {/* Topic stats row */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <BookOpen size={12} className="text-cyan-400" />
+                  <span className="text-xs text-foreground font-medium">{update.entryCount || 0} entries</span>
+                </div>
+                {phase && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 font-medium">
+                    {phase.charAt(0).toUpperCase() + phase.slice(1)} Phase
+                  </span>
+                )}
+                {update.sharedAt && (
+                  <span className="text-[10px] text-muted-foreground/50">
+                    Shared {new Date(update.sharedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* View Shared Collection CTA */}
+            <div className="mt-2">
+              <button
+                onClick={() => router.push(`/shared-topic/${update.id}?from=discover`)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-cyan-600/10 hover:bg-cyan-600/15 border border-cyan-500/20 transition-colors group"
+              >
+                <Globe size={14} className="text-cyan-400 shrink-0" />
+                <span className="text-xs text-cyan-300 font-medium flex-1 text-left">
+                  View Shared Collection
+                </span>
+                <Sparkles size={10} className="text-amber-400/50 group-hover:text-amber-400 transition-colors" />
+                <ChevronRight size={14} className="text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 mt-2">
+              {update.hashtags?.map((tag: string) => (
+                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 cursor-pointer hover:bg-cyan-600/25 transition-colors">#{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
   // Build merged & sorted live updates
-  const allLiveUpdates = [...liveContentUpdates, ...liveFitnessUpdates, ...liveWeightUpdates]
-    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+  const allLiveUpdates = [...liveLearningUpdates, ...liveContentUpdates, ...liveFitnessUpdates, ...liveWeightUpdates]
+    .sort((a, b) => new Date(b.updatedAt || b.sharedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.sharedAt || a.createdAt).getTime());
 
   // Group live updates for sectioned display
+  const learningLive = liveLearningUpdates;
   const contentLive = liveContentUpdates;
   const fitnessLive = [...liveFitnessUpdates, ...liveWeightUpdates];
 
@@ -394,6 +470,24 @@ export default function DiscoverPage() {
       {/* ═══ LIVE UPDATES SECTION — always visible at top, rich cards ═══ */}
       {!liveLoading && allLiveUpdates.length > 0 && (
         <div className="space-y-3">
+          {/* Learning Live Updates */}
+          {learningLive.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <BookOpen size={14} className="text-cyan-400" />
+                <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                <span className="text-[9px] text-muted-foreground/50 ml-1">{learningLive.length} update{learningLive.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-3">
+                {learningLive.map((u: any) => (
+                  <DiscoverLearningCard key={u.id} update={u} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Content Live Updates */}
           {contentLive.length > 0 && (
             <div>
