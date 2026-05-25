@@ -34,7 +34,7 @@ export default function HomePage() {
 
   const loadData = useCallback(async () => {
     try {
-      const res = await fetch('/api/home');
+      const res = await fetch(`/api/home?_t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) setHomeData(await res.json());
     } catch {}
     setLoading(false);

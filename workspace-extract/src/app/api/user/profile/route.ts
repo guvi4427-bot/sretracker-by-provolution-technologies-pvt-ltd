@@ -45,6 +45,7 @@ export async function GET() {
       shareAchievements: user.profile?.shareAchievements || false,
       shareFitnessProgress: user.profile?.shareFitnessProgress || false,
       shareContentStatus: user.profile?.shareContentStatus || false,
+      shareLearningProgress: user.profile?.shareLearningProgress || false,
       isPublic: user.profile?.isPublic !== undefined ? user.profile.isPublic : true,
       followerCount,
       followingCount,
@@ -64,7 +65,7 @@ export async function PATCH(request: Request) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { name, bio, avatarUrl, region, language, shareAchievements, isPublic, shareFitnessProgress, shareContentStatus, phone, currentPassword, newPassword } = body;
+    const { name, bio, avatarUrl, region, language, shareAchievements, isPublic, shareFitnessProgress, shareContentStatus, shareLearningProgress, phone, currentPassword, newPassword } = body;
 
     if (currentPassword && newPassword) {
       const user = await db.user.findUnique({ where: { id: session.user.id } });
@@ -86,6 +87,7 @@ export async function PATCH(request: Request) {
     if (isPublic !== undefined) profileData.isPublic = isPublic;
     if (shareFitnessProgress !== undefined) profileData.shareFitnessProgress = shareFitnessProgress;
     if (shareContentStatus !== undefined) profileData.shareContentStatus = shareContentStatus;
+    if (shareLearningProgress !== undefined) profileData.shareLearningProgress = shareLearningProgress;
 
     if (Object.keys(profileData).length > 0) {
       await db.profile.upsert({

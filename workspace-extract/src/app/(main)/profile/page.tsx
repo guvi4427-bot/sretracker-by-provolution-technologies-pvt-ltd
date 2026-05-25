@@ -54,7 +54,7 @@ export default function ProfilePage() {
   const { profile, fetchProfile } = useUserStore();
 
   // Restore editing state from sessionStorage if component remounted mid-edit
-  const savedEdit = restoreEditState();
+  const savedEdit = typeof window !== 'undefined' ? restoreEditState() : null;
   const [editing, setEditing] = useState(savedEdit?.editing || false);
   const [editName, setEditName] = useState(savedEdit?.name || '');
   const [editBio, setEditBio] = useState(savedEdit?.bio || '');
@@ -88,21 +88,22 @@ export default function ProfilePage() {
     setEditing(true);
   }, [profile]);
 
-  // Persist edit state changes while editing
-  const updateEditName = useCallback((val: string) => {
+  // Simple onChange handlers — no useCallback to avoid stale closure issues
+  // that caused the space-key crash bug
+  function handleNameChange(val: string) {
     setEditName(val);
     persistEditState({ editing: true, name: val, bio: editBio, phone: editPhone });
-  }, [editBio, editPhone]);
+  }
 
-  const updateEditBio = useCallback((val: string) => {
+  function handleBioChange(val: string) {
     setEditBio(val);
     persistEditState({ editing: true, name: editName, bio: val, phone: editPhone });
-  }, [editName, editPhone]);
+  }
 
-  const updateEditPhone = useCallback((val: string) => {
+  function handlePhoneChange(val: string) {
     setEditPhone(val);
     persistEditState({ editing: true, name: editName, bio: editBio, phone: val });
-  }, [editName, editBio]);
+  }
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -193,6 +194,13 @@ export default function ProfilePage() {
   async function toggleShareContentStatus(val: boolean) {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareContentStatus: val }) });
+      fetchProfile();
+    } catch {}
+  }
+
+  async function toggleShareLearningProgress(val: boolean) {
+    try {
+      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareLearningProgress: val }) });
       fetchProfile();
     } catch {}
   }
@@ -296,7 +304,7 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {editing ? (
-                <Input value={editName} onChange={e => updateEditName(e.target.value)} className="bg-white/5 border-white/10 text-foreground max-w-[200px]" />
+                <Input value={editName} onChange={e => handleNameChange(e.target.value)} className="bg-white/5 border-white/10 text-foreground max-w-[200px]" />
               ) : (
                 <h2 className="text-xl font-bold text-foreground">{profile.name || 'User'}</h2>
               )}
@@ -310,14 +318,14 @@ export default function ProfilePage() {
             </div>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
             {editing ? (
-              <Textarea value={editBio} onChange={e => updateEditBio(e.target.value)} className="bg-white/5 border-white/10 text-foreground mt-2 text-sm" rows={2} />
+              <Textarea value={editBio} onChange={e => handleBioChange(e.target.value)} className="bg-white/5 border-white/10 text-foreground mt-2 text-sm" rows={2} />
             ) : (
               <p className="text-sm text-muted-foreground mt-1">{profile.bio || 'No bio'}</p>
             )}
             {editing ? (
               <div className="flex items-center gap-2 mt-2">
                 <Phone size={14} className="text-muted-foreground shrink-0" />
-                <Input type="tel" placeholder="+91 9876543210" value={editPhone} onChange={e => updateEditPhone(e.target.value)} className="bg-white/5 border-white/10 text-foreground text-sm h-8" />
+                <Input type="tel" placeholder="+91 9876543210" value={editPhone} onChange={e => handlePhoneChange(e.target.value)} className="bg-white/5 border-white/10 text-foreground text-sm h-8" />
                 <span className="text-[9px] text-muted-foreground/40 flex items-center gap-0.5 shrink-0"><ShieldCheck size={9} />{t('profile.phoneAdminOnly')}</span>
               </div>
             ) : (
@@ -546,6 +554,16 @@ export default function ProfilePage() {
               <Switch checked={profile.shareContentStatus} onCheckedChange={toggleShareContentStatus} />
             </div>
             <p className="text-[10px] text-muted-foreground/50 mt-1">Show your content creation series and live status on your public profile</p>
+          </GlassCard>
+          <GlassCard className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookOpen size={16} className="text-cyan-400" />
+                <span className="text-sm text-muted-foreground">Share Learning Progress</span>
+              </div>
+              <Switch checked={profile.shareLearningProgress} onCheckedChange={toggleShareLearningProgress} />
+            </div>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">Show your shared learning topics and entry counts in the feed and discover page</p>
           </GlassCard>
           <GlassCard className="p-5">
             <div className="flex items-center justify-between">

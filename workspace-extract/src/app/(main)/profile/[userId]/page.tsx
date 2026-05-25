@@ -103,13 +103,19 @@ export default function PublicProfilePage() {
       const r = await fetch(`/api/user/public/${userId}?_t=` + Date.now(), { cache: 'no-store' });
       if (r.ok) {
         const data = await r.json();
-        // SAFE MERGE: always preserve followersCount/followingCount from previous state
-        setUserData((prev: any) => ({
-          ...prev,
-          ...data,
-          followersCount: data.followersCount ?? prev?.followersCount ?? 0,
-          followingCount: data.followingCount ?? prev?.followingCount ?? 0,
-        }));
+        setUserData((prev: any) => {
+          const prevFollowers = prev?.followersCount;
+          const prevFollowing = prev?.followingCount;
+          const newFollowers = typeof data.followersCount === 'number' ? data.followersCount : prevFollowers ?? 0;
+          const newFollowing = typeof data.followingCount === 'number' ? data.followingCount : prevFollowing ?? 0;
+          return {
+            ...prev,
+            ...data,
+            // Always preserve counts — use the higher of optimistic vs server value
+            followersCount: Math.max(newFollowers, prevFollowers ?? 0),
+            followingCount: Math.max(newFollowing, prevFollowing ?? 0),
+          };
+        });
       }
     } catch {}
     setLoading(false);
@@ -173,7 +179,6 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        // Optimistically update followers count for the target user
         setUserData((prev: any) => prev ? {
           ...prev,
           followersCount: (prev.followersCount ?? 0) + 1,
@@ -184,7 +189,6 @@ export default function PublicProfilePage() {
       } else if (data.status === 'unfollowed') {
         setFollowStatus('none');
         toast.success('Unfollowed');
-        // Optimistically update followers count for the target user
         setUserData((prev: any) => prev ? {
           ...prev,
           followersCount: Math.max(0, (prev.followersCount ?? 0) - 1),
@@ -193,12 +197,10 @@ export default function PublicProfilePage() {
         setFollowStatus('none');
         toast.success('Request withdrawn');
       }
-      // Dispatch events so app-shell refreshes notifications & achievement checks
-      // (follow API calls checkAndNotifyEligibleAchievements for both users)
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
-      // Delayed server refresh to get authoritative counts (safe merge preserves counts)
-      setTimeout(() => { loadUser(); }, 500);
+      // Delayed server refresh to get authoritative counts (safe merge uses Math.max)
+      setTimeout(() => { loadUser(); }, 1000);
     } catch {}
   }
 

@@ -80,10 +80,19 @@ export default function DiscoverPage() {
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Use refs for latest query/tab so the search callback doesn't need them as deps
+  const queryRef = useRef(query);
+  const activeTabRef = useRef(activeTab);
+  queryRef.current = query;
+  activeTabRef.current = activeTab;
+
   const search = useCallback(async (type?: string, searchQuery?: string) => {
-    const tab = type || activeTab;
-    const q = searchQuery ?? query;
-    if (!q.trim() && tab !== 'groups' && tab !== 'topics') { setResults({ posts: [], topics: [], groups: [], users: [] }); return; }
+    const tab = type || activeTabRef.current;
+    const q = searchQuery ?? queryRef.current;
+    if (!q.trim() && tab !== 'groups' && tab !== 'topics') {
+      setResults(prev => ({ ...prev, [tab]: [] }));
+      return;
+    }
     setLoading(true);
     try {
       const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(q.toLowerCase())}`);
@@ -93,7 +102,7 @@ export default function DiscoverPage() {
         setResults(prev => ({ ...prev, [tab]: items }));
       }
     } catch {} finally { setLoading(false); }
-  }, [query, activeTab]);
+  }, []);
 
   // Auto-fetch live updates on page load
   const fetchLiveUpdates = useCallback(async () => {
@@ -125,7 +134,7 @@ export default function DiscoverPage() {
       searchTimerRef.current = setTimeout(() => { search(); }, 300);
     }
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
-  }, [activeTab, query, search]);
+  }, [activeTab, query]); // removed `search` from deps — it's now stable
 
   // Handle URL query param
   useEffect(() => {

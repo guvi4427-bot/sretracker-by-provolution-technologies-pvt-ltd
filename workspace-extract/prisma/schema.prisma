@@ -96,6 +96,7 @@ model Profile {
   shareAchievements  Boolean  @default(false)
   shareFitnessProgress Boolean @default(false)
   shareContentStatus   Boolean @default(false)
+  shareLearningProgress Boolean @default(false)
   isPublic           Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

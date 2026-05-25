@@ -9,9 +9,17 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const myUserId = session.user.id;
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'users';
     const q = (searchParams.get('q') || '').toLowerCase();
+
+    // Get viewer's accepted following list for private profile visibility
+    const myFollowing = await db.follow.findMany({
+      where: { followerId: myUserId, status: 'accepted' },
+      select: { followingId: true },
+    });
+    const followingIds = new Set(myFollowing.map(f => f.followingId));
 
     if (type === 'posts') {
       const posts = await db.post.findMany({
@@ -22,8 +30,8 @@ export async function GET(req: Request) {
         include: {
           user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
           _count: { select: { likes: true, comments: true, reposts: true } },
-          likes: { where: { userId: session.user.id }, select: { id: true } },
-          reposts: { where: { userId: session.user.id }, select: { id: true } },
+          likes: { where: { userId: myUserId }, select: { id: true } },
+          reposts: { where: { userId: myUserId }, select: { id: true } },
         },
       });
       const formatted = posts.map(p => ({
@@ -38,7 +46,7 @@ export async function GET(req: Request) {
     if (type === 'users') {
       const profiles = await db.profile.findMany({
         where: {
-          userId: { not: session.user.id },
+          userId: { not: myUserId },
           ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { user: { username: { contains: q, mode: 'insensitive' } } }] } : {}),
           isPublic: true,
         },
@@ -46,7 +54,7 @@ export async function GET(req: Request) {
         include: { user: { select: { id: true, username: true } } },
       });
 
-      const follows = await db.follow.findMany({ where: { followerId: session.user.id }, select: { followingId: true, status: true } });
+      const follows = await db.follow.findMany({ where: { followerId: myUserId }, select: { followingId: true, status: true } });
       const followMap = new Map(follows.map(f => [f.followingId, f.status]));
 
       const users = profiles.map(p => ({
@@ -72,10 +80,19 @@ export async function GET(req: Request) {
         take: 20, orderBy: { sharedAt: 'desc' },
         include: {
           _count: { select: { entries: true } },
-          user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+          user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareLearningProgress: true } } } },
         },
       });
-      return NextResponse.json({ topics: topics.map(t => ({
+      // Filter: only show topics from users who have shareLearningProgress ON
+      // Private profiles: only show to followers
+      const visibleTopics = topics.filter(t => {
+        const isPublic = t.user.profile?.isPublic !== false;
+        const shareLearning = t.user.profile?.shareLearningProgress === true;
+        if (!shareLearning) return false;
+        if (isPublic) return true;
+        return followingIds.has(t.userId);
+      });
+      return NextResponse.json({ topics: visibleTopics.map(t => ({
         id: t.id, name: t.name, phase: t.phase, entryCount: t._count.entries,
         isSharedCollection: t.isSharedCollection, collectionVisibility: t.collectionVisibility,
         sharedAt: t.sharedAt,
@@ -95,121 +112,93 @@ export async function GET(req: Request) {
       const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
       const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
+      // Helper: check visibility for a user's update
+      function isVisible(userId: string, isPublic: boolean, shareSetting: boolean): boolean {
+        if (userId === myUserId) return shareSetting;
+        if (!shareSetting) return false;
+        if (isPublic) return true;
+        return followingIds.has(userId);
+      }
+
       const results: any[] = [];
 
       // Learning updates — shared learning topics
       if (!matchTag || matchTag === 'learning' || matchTag === 'study') {
         const sharedTopics = await db.learningTopic.findMany({
-          where: {
-            isSharedCollection: true,
-            user: { profile: { isPublic: true } },
-          },
+          where: { isSharedCollection: true },
           include: {
-            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareLearningProgress: true } } } },
             _count: { select: { entries: true } },
           },
           orderBy: { sharedAt: 'desc' },
-          take: 20,
+          take: 30,
         });
-        sharedTopics.forEach(t => {
+        sharedTopics.filter(t => isVisible(t.userId, t.user.profile?.isPublic !== false, t.user.profile?.shareLearningProgress === true)).forEach(t => {
           results.push({
-            id: t.id,
-            type: 'learning_update',
-            name: t.name,
-            phase: t.phase,
-            entryCount: t._count.entries,
-            sharedAt: t.sharedAt,
-            updatedAt: t.updatedAt,
-            createdAt: t.createdAt,
-            isOwn: t.userId === session.user.id,
+            id: t.id, type: 'learning_update', name: t.name, phase: t.phase, entryCount: t._count.entries,
+            sharedAt: t.sharedAt, updatedAt: t.updatedAt, createdAt: t.createdAt, isOwn: t.userId === myUserId,
             user: { id: t.user.id, username: t.user.username, name: t.user.profile?.name || t.user.username, avatarUrl: t.user.profile?.avatarUrl, verified: t.user.profile?.verified || false },
             hashtags: ['learning', t.phase || 'study'],
           });
         });
       }
 
-      // Content updates — filtered by hashtag if query matches
+      // Content updates
       if (!matchTag || matchTag === 'content' || matchTag === 'progress') {
         const contentEntries = await db.contentEntry.findMany({
-          where: {
-            user: { profile: { isPublic: true } },
-          },
           include: {
-            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareContentStatus: true } } } },
             series: { select: { name: true } },
           },
           orderBy: { updatedAt: 'desc' },
-          take: 20,
+          take: 30,
         });
-        contentEntries.forEach(e => {
+        contentEntries.filter(e => isVisible(e.userId, e.user.profile?.isPublic !== false, e.user.profile?.shareContentStatus === true)).forEach(e => {
           results.push({
-            id: e.id,
-            type: 'content_update',
-            title: e.title,
-            contentType: e.contentType,
-            liveStatus: e.liveStatus,
-            status: e.status,
-            updatedAt: e.updatedAt,
-            createdAt: e.createdAt,
-            seriesName: e.series?.name || null,
-            isOwn: e.userId === session.user.id,
+            id: e.id, type: 'content_update', title: e.title, contentType: e.contentType, liveStatus: e.liveStatus,
+            status: e.status, updatedAt: e.updatedAt, createdAt: e.createdAt, seriesName: e.series?.name || null, isOwn: e.userId === myUserId,
             user: { id: e.user.id, username: e.user.username, name: e.user.profile?.name || e.user.username, avatarUrl: e.user.profile?.avatarUrl, verified: e.user.profile?.verified || false },
             hashtags: ['content', 'progress'],
           });
         });
       }
 
-      // Fitness updates — filtered by hashtag if query matches
+      // Fitness updates
       if (!matchTag || matchTag === 'fitness' || matchTag === 'gains' || matchTag === 'shredding') {
         const workouts = await db.fitnessWorkoutLog.findMany({
-          where: {
-            user: { profile: { isPublic: true } },
-            createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-          },
+          where: { createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) } },
           include: {
-            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareFitnessProgress: true } } } },
           },
           orderBy: { createdAt: 'desc' },
-          take: 20,
+          take: 30,
         });
-        workouts.forEach(w => {
+        workouts.filter(w => isVisible(w.userId, w.user.profile?.isPublic !== false, w.user.profile?.shareFitnessProgress === true)).forEach(w => {
           const goal = goalMap.get(w.userId) || 'maintain';
           const isGaining = goal === 'gain';
           const tags = ['fitness', isGaining ? 'gains' : 'shredding'];
           if (matchTag && matchTag !== 'fitness' && !tags.includes(matchTag)) return;
           results.push({
-            id: w.id,
-            type: 'fitness_update',
-            subType: 'workout',
-            workoutType: w.workoutType,
-            duration: w.duration,
-            estimatedCalories: w.estimatedCalories,
-            muscleGroup: w.muscleGroup,
-            sets: w.sets,
-            reps: w.reps,
-            loadKg: w.loadKg,
-            date: w.date,
-            createdAt: w.createdAt,
-            isOwn: w.userId === session.user.id,
+            id: w.id, type: 'fitness_update', subType: 'workout', workoutType: w.workoutType, duration: w.duration,
+            estimatedCalories: w.estimatedCalories, muscleGroup: w.muscleGroup, sets: w.sets, reps: w.reps, loadKg: w.loadKg,
+            date: w.date, createdAt: w.createdAt, isOwn: w.userId === myUserId,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });
         });
 
         const weightLogs = await db.fitnessWeightLog.findMany({
-          where: {
-            user: { profile: { isPublic: true } },
-            createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-          },
+          where: { createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) } },
           include: {
-            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
+            user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareFitnessProgress: true } } } },
           },
           orderBy: { createdAt: 'desc' },
-          take: 20,
+          take: 30,
         });
 
         // Weight trend sparkline data per user
-        const weightUserIds = [...new Set(weightLogs.map(w => w.userId))];
+        const visibleWeightLogs = weightLogs.filter(w => isVisible(w.userId, w.user.profile?.isPublic !== false, w.user.profile?.shareFitnessProgress === true));
+        const weightUserIds = [...new Set(visibleWeightLogs.map(w => w.userId))];
         const weightTrendMap = new Map<string, { date: string; weight: number }[]>();
         if (weightUserIds.length > 0) {
           const trendData = await db.fitnessWeightLog.findMany({
@@ -227,7 +216,7 @@ export async function GET(req: Request) {
           });
         }
 
-        weightLogs.forEach(w => {
+        visibleWeightLogs.forEach(w => {
           const goal = goalMap.get(w.userId) || 'maintain';
           const isGaining = goal === 'gain';
           const tags = ['fitness', isGaining ? 'gains' : 'shredding'];
@@ -244,16 +233,8 @@ export async function GET(req: Request) {
 
           const currentWeight = currentWeightMap.get(w.userId) || null;
           results.push({
-            id: w.id,
-            type: 'fitness_update',
-            subType: 'weight',
-            weight: w.weight,
-            date: w.date,
-            createdAt: w.createdAt,
-            isOwn: w.userId === session.user.id,
-            trendData: trend,
-            trendDirection,
-            currentWeight,
+            id: w.id, type: 'fitness_update', subType: 'weight', weight: w.weight, date: w.date,
+            createdAt: w.createdAt, isOwn: w.userId === myUserId, trendData: trend, trendDirection, currentWeight,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });

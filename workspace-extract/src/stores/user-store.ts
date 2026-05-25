@@ -26,6 +26,7 @@ export interface UserProfile {
   shareAchievements: boolean;
   shareFitnessProgress: boolean;
   shareContentStatus: boolean;
+  shareLearningProgress: boolean;
   isPublic: boolean;
   category: string | null;
   followerCount: number;
@@ -119,6 +120,7 @@ function mapApiToProfile(data: any): UserProfile {
     shareAchievements: !!data.shareAchievements,
     shareFitnessProgress: !!data.shareFitnessProgress,
     shareContentStatus: !!data.shareContentStatus,
+    shareLearningProgress: !!data.shareLearningProgress,
     isPublic: data.isPublic !== undefined ? !!data.isPublic : true,
     category: data.category || null,
     followerCount: typeof data.followerCount === 'number' ? data.followerCount : 0,

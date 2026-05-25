@@ -6,15 +6,12 @@ import { db } from '@/lib/db';
 /**
  * GET /api/feed/live-updates
  *
- * Fetches live content, fitness & learning updates from ALL public users
- * (INCLUDING the logged-in user's own data, so they can see
- * their live status in the Feed/Discover tabs alongside other users').
+ * Fetches live content, fitness & learning updates from users.
  *
- * Returns four arrays:
- *  - learningUpdates: shared learning topics with entry counts
- *  - contentUpdates: ContentEntry records with user info + pipeline data
- *  - fitnessUpdates: recent workouts with user info
- *  - weightUpdates: recent weight logs with user info + trend sparkline data
+ * Visibility rules:
+ *  - Own data: always included (if share setting is ON)
+ *  - Public profiles: included if their respective share setting is ON
+ *  - Private profiles: included ONLY if the viewer follows them AND their share setting is ON
  */
 export async function GET(req: Request) {
   try {
@@ -28,6 +25,13 @@ export async function GET(req: Request) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
     const includeOwn = searchParams.get('includeOwn') !== 'false'; // default true
 
+    // ── Get the viewer's accepted following list (for private profile visibility) ──
+    const myFollowing = await db.follow.findMany({
+      where: { followerId: myUserId, status: 'accepted' },
+      select: { followingId: true },
+    });
+    const followingIds = new Set(myFollowing.map(f => f.followingId));
+
     // ── Fetch all fitness profiles for goal lookup ──
     const fitnessProfiles = await db.fitnessProfile.findMany({
       select: { userId: true, goal: true, weight: true },
@@ -35,184 +39,179 @@ export async function GET(req: Request) {
     const goalMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.goal || 'maintain']));
     const currentWeightMap = new Map(fitnessProfiles.map(fp => [fp.userId, fp.weight]));
 
-    // ── Learning Updates (shared learning topics) ──
-    // Always include own data + public users' data
-    const learningWhere: any = {
-      isSharedCollection: true,
-      OR: [
-        { userId: myUserId }, // Always include own
-        { user: { profile: { isPublic: true } } }, // Public users
-      ],
-    };
-    if (!includeOwn) learningWhere.OR = learningWhere.OR.filter((c: any) => !c.userId);
+    // ── Helper: is this user's update visible to the viewer? ──
+    // A user's update is visible if:
+    //   - It's the viewer's own data, OR
+    //   - The user is public AND has the relevant share setting ON, OR
+    //   - The user is private AND the viewer follows them AND has the relevant share setting ON
+    function isVisible(userId: string, isPublic: boolean, shareSetting: boolean): boolean {
+      if (userId === myUserId && includeOwn) return shareSetting;
+      if (!shareSetting) return false;
+      if (isPublic) return true;
+      // Private profile: only visible to followers
+      return followingIds.has(userId);
+    }
 
+    // ── Learning Updates (shared learning topics) ──
+    // Need to check shareLearningProgress + isPublic/follower status
     const sharedTopics = await db.learningTopic.findMany({
-      where: learningWhere,
+      where: {
+        isSharedCollection: true,
+      },
       include: {
         user: {
           select: {
             id: true,
             username: true,
-            profile: { select: { name: true, avatarUrl: true, verified: true } },
+            profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareLearningProgress: true } },
           },
         },
         _count: { select: { entries: true } },
       },
       orderBy: { sharedAt: 'desc' },
-      take: limit,
+      take: limit * 2, // fetch extra then filter
     });
 
-    const learningUpdates = sharedTopics.map(t => ({
-      id: t.id,
-      type: 'learning' as const,
-      name: t.name,
-      phase: t.phase,
-      entryCount: t._count.entries,
-      sharedAt: t.sharedAt,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      isOwn: t.userId === myUserId,
-      user: {
-        id: t.user.id,
-        username: t.user.username,
-        name: t.user.profile?.name || t.user.username,
-        avatarUrl: t.user.profile?.avatarUrl,
-        verified: t.user.profile?.verified || false,
-      },
-      hashtags: ['learning', t.phase || 'study'],
-    }));
+    const learningUpdates = sharedTopics
+      .filter(t => isVisible(t.userId, t.user.profile?.isPublic !== false, t.user.profile?.shareLearningProgress === true))
+      .slice(0, limit)
+      .map(t => ({
+        id: t.id,
+        type: 'learning' as const,
+        name: t.name,
+        phase: t.phase,
+        entryCount: t._count.entries,
+        sharedAt: t.sharedAt,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        isOwn: t.userId === myUserId,
+        user: {
+          id: t.user.id,
+          username: t.user.username,
+          name: t.user.profile?.name || t.user.username,
+          avatarUrl: t.user.profile?.avatarUrl,
+          verified: t.user.profile?.verified || false,
+        },
+        hashtags: ['learning', t.phase || 'study'],
+      }));
 
     // ── Content Updates ──
-    // Always include own data + public users' data
-    const contentWhere: any = {
-      OR: [
-        { userId: myUserId }, // Always include own
-        { user: { profile: { isPublic: true } } }, // Public users
-      ],
-    };
-    if (!includeOwn) contentWhere.OR = contentWhere.OR.filter((c: any) => !c.userId);
-
+    // Need to check shareContentStatus + isPublic/follower status
     const contentEntries = await db.contentEntry.findMany({
-      where: contentWhere,
       include: {
         user: {
           select: {
             id: true,
             username: true,
-            profile: { select: { name: true, avatarUrl: true, verified: true } },
+            profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareContentStatus: true } },
           },
         },
         series: { select: { name: true } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: limit,
+      take: limit * 2,
     });
 
-    const contentUpdates = contentEntries.map(e => ({
-      id: e.id,
-      type: 'content' as const,
-      title: e.title,
-      contentType: e.contentType,
-      liveStatus: e.liveStatus,
-      status: e.status,
-      platform: e.platform,
-      updatedAt: e.updatedAt,
-      createdAt: e.createdAt,
-      seriesName: e.series?.name || null,
-      isOwn: e.userId === myUserId,
-      user: {
-        id: e.user.id,
-        username: e.user.username,
-        name: e.user.profile?.name || e.user.username,
-        avatarUrl: e.user.profile?.avatarUrl,
-        verified: e.user.profile?.verified || false,
-      },
-      hashtags: ['content', 'progress'],
-    }));
+    const contentUpdates = contentEntries
+      .filter(e => isVisible(e.userId, e.user.profile?.isPublic !== false, e.user.profile?.shareContentStatus === true))
+      .slice(0, limit)
+      .map(e => ({
+        id: e.id,
+        type: 'content' as const,
+        title: e.title,
+        contentType: e.contentType,
+        liveStatus: e.liveStatus,
+        status: e.status,
+        platform: e.platform,
+        updatedAt: e.updatedAt,
+        createdAt: e.createdAt,
+        seriesName: e.series?.name || null,
+        isOwn: e.userId === myUserId,
+        user: {
+          id: e.user.id,
+          username: e.user.username,
+          name: e.user.profile?.name || e.user.username,
+          avatarUrl: e.user.profile?.avatarUrl,
+          verified: e.user.profile?.verified || false,
+        },
+        hashtags: ['content', 'progress'],
+      }));
 
     // ── Fitness Updates (Workouts) ──
-    // Always include own data + public users' data
-    const fitnessWhere: any = {
-      createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-      OR: [
-        { userId: myUserId }, // Always include own
-        { user: { profile: { isPublic: true } } }, // Public users
-      ],
-    };
-    if (!includeOwn) fitnessWhere.OR = fitnessWhere.OR.filter((c: any) => !c.userId);
-
+    // Need to check shareFitnessProgress + isPublic/follower status
     const recentWorkouts = await db.fitnessWorkoutLog.findMany({
-      where: fitnessWhere,
+      where: {
+        createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      },
       include: {
         user: {
           select: {
             id: true,
             username: true,
-            profile: { select: { name: true, avatarUrl: true, verified: true } },
+            profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareFitnessProgress: true } },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: limit * 2,
     });
 
-    const fitnessUpdates = recentWorkouts.map(w => {
-      const goal = goalMap.get(w.userId) || 'maintain';
-      const isGaining = goal === 'gain';
-      return {
-        id: w.id,
-        type: 'fitness' as const,
-        subType: 'workout' as const,
-        workoutType: w.workoutType,
-        duration: w.duration,
-        estimatedCalories: w.estimatedCalories,
-        muscleGroup: w.muscleGroup,
-        sets: w.sets,
-        reps: w.reps,
-        loadKg: w.loadKg,
-        date: w.date,
-        createdAt: w.createdAt,
-        isOwn: w.userId === myUserId,
-        user: {
-          id: w.user.id,
-          username: w.user.username,
-          name: (w.user as any).profile?.name || w.user.username,
-          avatarUrl: (w.user as any).profile?.avatarUrl,
-          verified: (w.user as any).profile?.verified || false,
-          fitnessGoal: goal,
-        },
-        hashtags: ['fitness', isGaining ? 'gains' : 'shredding'],
-      };
-    });
+    const fitnessUpdates = recentWorkouts
+      .filter(w => isVisible(w.userId, w.user.profile?.isPublic !== false, w.user.profile?.shareFitnessProgress === true))
+      .slice(0, limit)
+      .map(w => {
+        const goal = goalMap.get(w.userId) || 'maintain';
+        const isGaining = goal === 'gain';
+        return {
+          id: w.id,
+          type: 'fitness' as const,
+          subType: 'workout' as const,
+          workoutType: w.workoutType,
+          duration: w.duration,
+          estimatedCalories: w.estimatedCalories,
+          muscleGroup: w.muscleGroup,
+          sets: w.sets,
+          reps: w.reps,
+          loadKg: w.loadKg,
+          date: w.date,
+          createdAt: w.createdAt,
+          isOwn: w.userId === myUserId,
+          user: {
+            id: w.user.id,
+            username: w.user.username,
+            name: (w.user as any).profile?.name || w.user.username,
+            avatarUrl: (w.user as any).profile?.avatarUrl,
+            verified: (w.user as any).profile?.verified || false,
+            fitnessGoal: goal,
+          },
+          hashtags: ['fitness', isGaining ? 'gains' : 'shredding'],
+        };
+      });
 
     // ── Weight Updates ──
-    // Always include own data + public users' data
-    const weightWhere: any = {
-      createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-      OR: [
-        { userId: myUserId }, // Always include own
-        { user: { profile: { isPublic: true } } }, // Public users
-      ],
-    };
-    if (!includeOwn) weightWhere.OR = weightWhere.OR.filter((c: any) => !c.userId);
-
     const recentWeightLogs = await db.fitnessWeightLog.findMany({
-      where: weightWhere,
+      where: {
+        createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      },
       include: {
         user: {
           select: {
             id: true,
             username: true,
-            profile: { select: { name: true, avatarUrl: true, verified: true } },
+            profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareFitnessProgress: true } },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: limit * 2,
     });
 
+    // Filter by visibility
+    const visibleWeightLogs = recentWeightLogs
+      .filter(w => isVisible(w.userId, w.user.profile?.isPublic !== false, w.user.profile?.shareFitnessProgress === true));
+
     // ── Weight trend sparkline data per user ──
-    const weightUserIds = [...new Set(recentWeightLogs.map(w => w.userId))];
+    const weightUserIds = [...new Set(visibleWeightLogs.map(w => w.userId))];
     const weightTrendMap = new Map<string, { date: string; weight: number }[]>();
 
     if (weightUserIds.length > 0) {
@@ -234,7 +233,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const weightUpdates = recentWeightLogs.map(w => {
+    const weightUpdates = visibleWeightLogs.slice(0, limit).map(w => {
       const goal = goalMap.get(w.userId) || 'maintain';
       const isGaining = goal === 'gain';
       const trend = weightTrendMap.get(w.userId) || [];

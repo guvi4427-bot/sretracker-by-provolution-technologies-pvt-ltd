@@ -86,6 +86,7 @@ export async function GET(
           verified: user.profile.verified,
           isPublic: false,
           shareAchievements: user.profile.shareAchievements,
+          shareLearningProgress: user.profile.shareLearningProgress,
         },
         followersCount: followerCount,
         followingCount: followingCount,
@@ -112,6 +113,7 @@ export async function GET(
         phaseActivityMap: user.profile.phaseActivityMap,
         isPublic: true,
         shareAchievements: user.profile.shareAchievements,
+        shareLearningProgress: user.profile.shareLearningProgress,
       },
       achievements: user.profile.shareAchievements
         ? user.achievements.map((a) => ({
