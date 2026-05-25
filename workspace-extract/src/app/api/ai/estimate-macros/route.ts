@@ -3,13 +3,29 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { FOOD_DATABASE, UNIT_TO_GRAMS } from '@/lib/constants';
 import { aiStructuredChat } from '@/lib/ai-provider';
+import { db } from '@/lib/db';
 
 // ── Unit Conversion Engine ──
 // Converts any user input (quantity + unit) into grams for macro calculation.
 // All FOOD_DATABASE entries are per 100g, so: multiplier = grams / 100
 
+// Imperial unit aliases
+const IMPERIAL_ALIASES: Record<string, string> = {
+  'oz': 'oz',
+  'ounce': 'oz',
+  'ounces': 'oz',
+  'fl oz': 'fl oz',
+  'fl. oz.': 'fl oz',
+  'fluid ounce': 'fl oz',
+  'fluid ounces': 'fl oz',
+  'lb': 'lb',
+  'lbs': 'lb',
+  'pound': 'lb',
+  'pounds': 'lb',
+};
+
 function convertToGrams(mealName: string, quantity: number, unit: string): number {
-  const u = unit.toLowerCase().trim();
+  const u = IMPERIAL_ALIASES[unit.toLowerCase().trim()] || unit.toLowerCase().trim();
   const foodKey = mealName.toLowerCase().trim();
 
   // Direct weight/volume units → already in grams/ml
@@ -34,12 +50,14 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
     return quantity * UNIT_TO_GRAMS[defaultKey];
   }
 
-  // Common units not in UNIT_TO_GRAMS defaults
+  // Common units not in UNIT_TO_GRAMS defaults (includes Indian-specific)
   const EXTRA_UNIT_GRAMS: Record<string, number> = {
     'piece': 120, 'pc': 120, 'slice': 30, 'bowl': 250, 'plate': 300,
     'glass': 240, 'can': 330, 'bottle': 500, 'packet': 50, 'bar': 60,
     'scoop': 30, 'medium': 150, 'large': 250, 'small': 80, 'whole': 200,
     'half': 100, 'handful': 30, 'piece(s)': 120, 'pcs': 120, 'katori': 150,
+    // Imperial
+    'oz': 28.35, 'fl oz': 30, 'lb': 453.6, 'lbs': 453.6,
   };
 
   if (EXTRA_UNIT_GRAMS[u]) {
@@ -51,8 +69,6 @@ function convertToGrams(mealName: string, quantity: number, unit: string): numbe
 }
 
 // ── Database Search (scoring-based matching) ──
-// Uses a scoring system to find the best match, avoiding false positives
-// like "cooked oats" matching "Oats" (dry) instead of "Oatmeal" (cooked).
 function findInDatabase(searchKey: string) {
   let bestMatch: typeof FOOD_DATABASE[number] | null = null;
   let bestScore = 0;
@@ -118,12 +134,22 @@ export async function POST(req: Request) {
     const userUnit = (quantityUnit || 'g').toLowerCase();
     const searchKey = mealName.toLowerCase().trim();
 
+    // Fetch user's fitness profile for context (diet type, unit system)
+    let userDietType = '';
+    let userUnitSystem = 'metric';
+    try {
+      const profile = await db.fitnessProfile.findUnique({
+        where: { userId: session.user.id },
+        select: { dietType: true, unitSystem: true },
+      });
+      if (profile?.dietType) userDietType = profile.dietType;
+      if (profile?.unitSystem) userUnitSystem = profile.unitSystem;
+    } catch {}
+
     // ── Step 1: Convert user input to grams ──
     const grams = convertToGrams(mealName, quantityNum, userUnit);
 
     // ── Step 2: Run DB lookup AND AI estimation IN PARALLEL ──
-    // This is faster than sequential because AI is the bottleneck (~2-5s),
-    // while DB lookup is instant. Total time = max(DB, AI) ≈ AI time.
     const [dbResult, aiResult] = await Promise.allSettled([
       // DB lookup (synchronous, wrapped in promise for parallel execution)
       Promise.resolve().then(() => {
@@ -133,16 +159,37 @@ export async function POST(req: Request) {
       }),
       // AI estimation (async, 2-5 seconds)
       (async () => {
-        const aiPrompt = `Estimate macros for: ${mealName}, quantity: ${quantityNum} ${userUnit} (~${Math.round(grams)}g).
+        const unitContext = userUnitSystem === 'imperial'
+          ? 'The user uses the imperial system (oz, lbs, inches). Convert internally to metric for calculations.'
+          : '';
+
+        const dietContext = userDietType
+          ? `The user follows a ${userDietType} diet.`
+          : '';
+
+        const aiPrompt = `Estimate nutritional macros for: "${mealName}", quantity: ${quantityNum} ${userUnit} (~${Math.round(grams)}g).
+
+${dietContext} ${unitContext}
+
+This could be an Indian dish (e.g., dal, biryani, paneer butter masala, chole, samosa, dosa, idli, chapati, rajma, sambhar, poha, upma, kadhi, thali, gulab jamun, lassi, etc.) or a Western dish (e.g., pizza, burger, pasta, steak, salad, sandwich, smoothie bowl, etc.) or any world cuisine.
+
+Consider common preparation methods:
+- Indian curries: typically cooked with oil/ghee, onions, tomatoes, and spices
+- Indian breads: chapati/roti are whole wheat, paratha has more fat, naan uses refined flour
+- Dal/lentils: cooked with water, tempered with oil/ghee and spices (tadka)
+- Western grilled items: minimal added fat
+- Fried items: significantly higher fat content
+- Restaurant/hotel preparations: typically 30-50% more oil than home-cooked
+
 Return ONLY JSON: {"calories":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number}
-Rules: Calculate for EXACT quantity specified, not per-100g. Use USDA data.`;
+Rules: Calculate for EXACT quantity specified, not per-100g. Use IFCT (Indian Food Composition Tables) for Indian foods, USDA for Western foods. Be accurate for both home-cooked and restaurant versions — use standard home-cooked estimates unless "restaurant" or "hotel" is specified.`;
 
         const result = await aiStructuredChat<{
           calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number;
         }>(
           [{ role: 'user', content: aiPrompt }],
-          'You are a nutrition database. Return only valid JSON with macro estimates for the exact food quantity specified. Never return per-100g values unless user asked for 100g.',
-          120
+          'You are an expert nutrition database specializing in both Indian and Western cuisines. You have deep knowledge of IFCT (Indian Food Composition Tables) and USDA food data. You understand regional Indian cooking variations (North Indian, South Indian, Gujarati, Bengali, Punjabi, etc.) and can accurately estimate macros for homemade vs restaurant preparations. Return only valid JSON with macro estimates for the exact food quantity specified. Never return per-100g values unless user asked for 100g.',
+          150
         );
         return result;
       })(),
@@ -152,16 +199,12 @@ Rules: Calculate for EXACT quantity specified, not per-100g. Use USDA data.`;
     const aiMacros = aiResult.status === 'fulfilled' ? aiResult.value : null;
 
     // ── Step 3: Compare DB and AI results ──
-    // If both sources are available, compare calories (most reliable indicator).
-    // If within 25% → they "match" → use DB values (more precise for standard foods).
-    // If not within 25% → use AI values (better for complex/custom preparations).
     if (dbMacros && aiMacros && aiMacros.calories > 0) {
       const calDiff = Math.abs(dbMacros.calories - aiMacros.calories);
       const avgCal = (dbMacros.calories + aiMacros.calories) / 2;
       const percentDiff = avgCal > 0 ? (calDiff / avgCal) * 100 : 100;
 
       if (percentDiff <= 25) {
-        // Values match — use DB values (more reliable for standard foods)
         return NextResponse.json({
           calories: dbMacros.calories,
           proteinG: dbMacros.proteinG,
@@ -173,7 +216,6 @@ Rules: Calculate for EXACT quantity specified, not per-100g. Use USDA data.`;
           calculatedGrams: Math.round(grams),
         });
       } else {
-        // Values don't match — use AI (better for complex/custom preparations)
         return NextResponse.json({
           calories: Math.round(aiMacros.calories),
           proteinG: Math.round((aiMacros.proteinG || 0) * 10) / 10,
@@ -187,7 +229,6 @@ Rules: Calculate for EXACT quantity specified, not per-100g. Use USDA data.`;
       }
     }
 
-    // ── Only DB available (AI failed) ──
     if (dbMacros) {
       return NextResponse.json({
         calories: dbMacros.calories,
@@ -201,7 +242,6 @@ Rules: Calculate for EXACT quantity specified, not per-100g. Use USDA data.`;
       });
     }
 
-    // ── Only AI available (no DB match) ──
     if (aiMacros && aiMacros.calories > 0) {
       return NextResponse.json({
         calories: Math.round(aiMacros.calories),

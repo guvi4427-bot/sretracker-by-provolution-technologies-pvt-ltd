@@ -21,7 +21,7 @@ const TABS_LIST = ['overview', 'nutrition', 'workouts', 'progress', 'aiCoach'];
 const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
 const GOALS = ['lose', 'maintain', 'gain'];
 const WORKOUT_TYPES = ['Running', 'Walking', 'Cycling', 'Swimming', 'Weight Training', 'HIIT', 'Yoga', 'Pilates', 'Dance', 'Boxing', 'Jump Rope', 'Other'];
-const SERVING_UNITS = ['g', 'tsp', 'ml', 'serving', 'cup', 'tbsp', 'piece', 'slice', 'bowl', 'plate', 'glass', 'scoop', 'bar'];
+const SERVING_UNITS = ['g', 'tsp', 'ml', 'serving', 'cup', 'tbsp', 'piece', 'slice', 'bowl', 'plate', 'glass', 'scoop', 'bar', 'oz', 'katori', 'handful'];
 
 const WEIGHT_TYPES = ['Running', 'Walking', 'Cycling', 'Swimming', 'Weight Training',
   'HIIT', 'Yoga', 'Pilates', 'Dance', 'Boxing', 'Jump Rope', 'Other'] as const;
@@ -101,8 +101,19 @@ export default function FitnessPage() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ weight: '', height: '', age: '', gender: 'male', activityLevel: 'moderate', goal: 'maintain' });
+  const [profileForm, setProfileForm] = useState({ weight: '', height: '', age: '', gender: 'male', activityLevel: 'moderate', goal: 'maintain', unitSystem: 'metric' as 'metric' | 'imperial' });
   const [profileSaving, setProfileSaving] = useState(false);
+
+  // Unit conversion helpers
+  const isImperial = profileForm.unitSystem === 'imperial';
+  const kgToLbs = (kg: number) => Math.round(kg * 2.20462 * 10) / 10;
+  const lbsToKg = (lbs: number) => Math.round(lbs / 2.20462 * 10) / 10;
+  const cmToIn = (cm: number) => Math.round(cm / 2.54 * 10) / 10;
+  const inToCm = (inches: number) => Math.round(inches * 2.54 * 10) / 10;
+  const displayWeight = (kg: number) => isImperial ? kgToLbs(kg) : kg;
+  const displayHeight = (cm: number) => isImperial ? cmToIn(cm) : cm;
+  const weightUnit = isImperial ? 'lbs' : 'kg';
+  const heightUnit = isImperial ? 'in' : 'cm';
   const today = new Date().toISOString().split('T')[0];
   const [mealCategory, setMealCategory] = useState<MealCategory>('breakfast');
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(today);
@@ -131,12 +142,13 @@ export default function FitnessPage() {
         if (fp && fp !== null && (fp.weight || fp.height || fp.age || fp.gender || fp.tdee)) {
           setFitnessProfile(fp);
           setProfileForm({
-            weight: fp.weight?.toString() || '',
-            height: fp.height?.toString() || '',
+            weight: fp.weight != null ? (isImperial ? kgToLbs(fp.weight).toString() : fp.weight.toString()) : '',
+            height: fp.height != null ? (isImperial ? cmToIn(fp.height).toString() : fp.height.toString()) : '',
             age: fp.age?.toString() || '',
             gender: fp.gender || 'male',
             activityLevel: fp.activityLevel || 'moderate',
             goal: fp.goal || 'maintain',
+            unitSystem: (fp.unitSystem as 'metric' | 'imperial') || 'metric',
           });
         } else {
           setFitnessProfile(null);
@@ -262,30 +274,36 @@ export default function FitnessPage() {
     fatG:     daysWithData.reduce((a, d) => a + d.fatG,     0) / daysWithData.length,
   } : null;
 
-  // Computed values from profile form
+  // Computed values from profile form (always convert to metric for TDEE calculation)
+  const metricWeight = isImperial ? lbsToKg(Number(profileForm.weight)) : Number(profileForm.weight);
+  const metricHeight = isImperial ? inToCm(Number(profileForm.height)) : Number(profileForm.height);
   const computedTDEE = profileForm.weight && profileForm.height && profileForm.age
-    ? calcTDEE(Number(profileForm.weight), Number(profileForm.height), Number(profileForm.age), profileForm.gender, profileForm.activityLevel)
+    ? calcTDEE(metricWeight, metricHeight, Number(profileForm.age), profileForm.gender, profileForm.activityLevel)
     : 0;
   const computedRequiredCal = computedTDEE > 0 ? calcRequiredCal(computedTDEE, profileForm.goal) : 0;
-  const computedMacros = computedRequiredCal > 0 ? calcMacros(computedRequiredCal, Number(profileForm.weight)) : null;
+  const computedMacros = computedRequiredCal > 0 ? calcMacros(computedRequiredCal, metricWeight) : null;
 
   // Get current targets from fitness profile or computed
   const currentTDEE = fitnessProfile?.tdee || computedTDEE || 0;
   const currentRequiredCal = fitnessProfile?.calorieTarget || computedRequiredCal || 0;
-  const currentMacros = currentRequiredCal > 0 ? calcMacros(currentRequiredCal, Number(profileForm.weight || fitnessProfile?.weight || 70)) : null;
+  const currentMacros = currentRequiredCal > 0 ? calcMacros(currentRequiredCal, fitnessProfile?.weight || metricWeight || 70) : null;
 
   async function saveFitnessProfile() {
     setProfileSaving(true);
     try {
-      const tdee = computedTDEE;
-      const requiredCal = computedRequiredCal;
+      // Convert display values to metric for storage
+      const weightKg = isImperial ? lbsToKg(Number(profileForm.weight)) : Number(profileForm.weight);
+      const heightCm = isImperial ? inToCm(Number(profileForm.height)) : Number(profileForm.height);
+      const tdee = calcTDEE(weightKg, heightCm, Number(profileForm.age), profileForm.gender, profileForm.activityLevel);
+      const requiredCal = calcRequiredCal(tdee, profileForm.goal);
       const body: any = {
-        weight: Number(profileForm.weight),
-        height: Number(profileForm.height),
+        weight: weightKg,
+        height: heightCm,
         age: Number(profileForm.age),
         gender: profileForm.gender,
         activityLevel: profileForm.activityLevel,
         goal: profileForm.goal,
+        unitSystem: profileForm.unitSystem,
       };
       if (tdee > 0) body.tdee = tdee;
       if (requiredCal > 0) body.calorieTarget = requiredCal;
@@ -374,7 +392,7 @@ export default function FitnessPage() {
           muscleGroup: selectedWorkoutType === 'Weight Training' ? muscleGroup : undefined,
           sets: selectedWorkoutType === 'Weight Training' ? parseInt(workoutSets) || undefined : undefined,
           reps: selectedWorkoutType === 'Weight Training' ? parseInt(workoutReps) || undefined : undefined,
-          loadKg: selectedWorkoutType === 'Weight Training' ? parseFloat(workoutLoad) || undefined : undefined,
+          loadKg: selectedWorkoutType === 'Weight Training' ? (isImperial ? lbsToKg(parseFloat(workoutLoad)) : parseFloat(workoutLoad)) || undefined : undefined,
           workoutSplit: fitnessProfile?.workoutSplit || undefined,
         }),
       });
@@ -401,7 +419,8 @@ export default function FitnessPage() {
   async function addWeight() {
     if (!weightValue) return;
     try {
-      const r = await fetch('/api/fitness/weight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weight: parseFloat(weightValue), date: today }) });
+      const weightKg = isImperial ? lbsToKg(parseFloat(weightValue)) : parseFloat(weightValue);
+      const r = await fetch('/api/fitness/weight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weight: weightKg, date: today }) });
       if (r.ok) {
         const d = await r.json();
         const newWeight = d.weightLog;
@@ -488,9 +507,43 @@ export default function FitnessPage() {
 
             {(!fitnessProfile || editProfile) ? (
               <div className="space-y-4">
+                {/* Unit System Toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Units:</span>
+                  <div className="flex gap-1">
+                    <SelectPill label="Metric (kg/cm)" selected={profileForm.unitSystem === 'metric'} onClick={() => {
+                      const currentWeight = Number(profileForm.weight) || 0;
+                      const currentHeight = Number(profileForm.height) || 0;
+                      if (profileForm.unitSystem === 'imperial') {
+                        setProfileForm(p => ({
+                          ...p,
+                          unitSystem: 'metric',
+                          weight: currentWeight ? lbsToKg(currentWeight).toString() : '',
+                          height: currentHeight ? inToCm(currentHeight).toString() : '',
+                        }));
+                      } else {
+                        setProfileForm(p => ({ ...p, unitSystem: 'metric' }));
+                      }
+                    }} color="blue" />
+                    <SelectPill label="Imperial (lbs/in)" selected={profileForm.unitSystem === 'imperial'} onClick={() => {
+                      const currentWeight = Number(profileForm.weight) || 0;
+                      const currentHeight = Number(profileForm.height) || 0;
+                      if (profileForm.unitSystem === 'metric') {
+                        setProfileForm(p => ({
+                          ...p,
+                          unitSystem: 'imperial',
+                          weight: currentWeight ? kgToLbs(currentWeight).toString() : '',
+                          height: currentHeight ? cmToIn(currentHeight).toString() : '',
+                        }));
+                      } else {
+                        setProfileForm(p => ({ ...p, unitSystem: 'imperial' }));
+                      }
+                    }} color="blue" />
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1"><Label className="text-muted-foreground text-xs">Body Weight (kg)</Label><Input type="number" value={profileForm.weight} onChange={e => setProfileForm(p => ({ ...p, weight: e.target.value }))} placeholder="70" className="bg-white/5 border-border text-foreground h-9" /></div>
-                  <div className="space-y-1"><Label className="text-muted-foreground text-xs">Height (cm)</Label><Input type="number" value={profileForm.height} onChange={e => setProfileForm(p => ({ ...p, height: e.target.value }))} placeholder="170" className="bg-white/5 border-border text-foreground h-9" /></div>
+                  <div className="space-y-1"><Label className="text-muted-foreground text-xs">Body Weight ({weightUnit})</Label><Input type="number" value={profileForm.weight} onChange={e => setProfileForm(p => ({ ...p, weight: e.target.value }))} placeholder={isImperial ? '154' : '70'} className="bg-white/5 border-border text-foreground h-9" /></div>
+                  <div className="space-y-1"><Label className="text-muted-foreground text-xs">Height ({heightUnit})</Label><Input type="number" value={profileForm.height} onChange={e => setProfileForm(p => ({ ...p, height: e.target.value }))} placeholder={isImperial ? '67' : '170'} className="bg-white/5 border-border text-foreground h-9" /></div>
                   <div className="space-y-1"><Label className="text-muted-foreground text-xs">Age</Label><Input type="number" value={profileForm.age} onChange={e => setProfileForm(p => ({ ...p, age: e.target.value }))} placeholder="25" className="bg-white/5 border-border text-foreground h-9" /></div>
                   <div className="space-y-1"><Label className="text-muted-foreground text-xs">Gender</Label>
                     <select value={profileForm.gender} onChange={e => setProfileForm(p => ({ ...p, gender: e.target.value }))} className="w-full bg-white/5 border border-border text-foreground rounded-md px-3 py-2 text-sm h-9">
@@ -541,8 +594,8 @@ export default function FitnessPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="text-center"><p className="text-lg font-bold text-foreground">{fitnessProfile.weight || '—'}</p><p className="text-[10px] text-muted-foreground/70">Weight (kg)</p></div>
-                <div className="text-center"><p className="text-lg font-bold text-foreground">{fitnessProfile.height || '—'}</p><p className="text-[10px] text-muted-foreground/70">Height (cm)</p></div>
+                <div className="text-center"><p className="text-lg font-bold text-foreground">{fitnessProfile.weight ? displayWeight(fitnessProfile.weight) : '—'}</p><p className="text-[10px] text-muted-foreground/70">Weight ({weightUnit})</p></div>
+                <div className="text-center"><p className="text-lg font-bold text-foreground">{fitnessProfile.height ? displayHeight(fitnessProfile.height) : '—'}</p><p className="text-[10px] text-muted-foreground/70">Height ({heightUnit})</p></div>
                 <div className="text-center"><p className="text-lg font-bold text-foreground capitalize">{fitnessProfile.activityLevel || '—'}</p><p className="text-[10px] text-muted-foreground/70">Activity</p></div>
                 <div className="text-center"><p className="text-lg font-bold text-foreground capitalize">{fitnessProfile.goal || '—'}</p><p className="text-[10px] text-muted-foreground/70">Goal</p></div>
               </div>
@@ -1064,7 +1117,7 @@ export default function FitnessPage() {
                       <Input type="number" value={workoutReps} onChange={e => setWorkoutReps(e.target.value)} placeholder="e.g. 10" className="bg-accent border-border text-foreground" />
                     </div>
                     <div>
-                      <Label className="text-muted-foreground text-xs mb-1 block">Load (kg)</Label>
+                      <Label className="text-muted-foreground text-xs mb-1 block">Load ({weightUnit})</Label>
                       <Input type="number" value={workoutLoad} onChange={e => setWorkoutLoad(e.target.value)} placeholder="e.g. 80" className="bg-accent border-border text-foreground" />
                     </div>
                   </div>
@@ -1221,7 +1274,7 @@ export default function FitnessPage() {
           <GlassCard className="p-4">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('fitness.logWeight')}</h3>
             <div className="flex gap-2">
-              <Input type="number" value={weightValue} onChange={e => setWeightValue(e.target.value)} placeholder="Weight (kg)" className="bg-accent border-border text-foreground" />
+              <Input type="number" value={weightValue} onChange={e => setWeightValue(e.target.value)} placeholder={`Weight (${weightUnit})`} className="bg-accent border-border text-foreground" />
               <Button onClick={addWeight} className="gradient-blue">{t('common.add')}</Button>
             </div>
             <p className="text-[10px] text-muted-foreground/50 mt-1">Targets auto-recalculate when weight changes</p>

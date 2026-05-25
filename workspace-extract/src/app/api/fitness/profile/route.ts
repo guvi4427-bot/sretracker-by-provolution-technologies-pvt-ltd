@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   try {
     const userId = await getUserId();
     const body = await request.json();
-    const { weight, height, age, gender, activityLevel, goal, workoutLevel, dietType, fitnessPhase } = body;
+    const { weight, height, age, gender, activityLevel, goal, workoutLevel, dietType, fitnessPhase, unitSystem } = body;
 
     let tdee: number | null = null;
     let calorieTarget: number | null = null;
@@ -76,6 +76,7 @@ export async function POST(request: Request) {
         workoutLevel: workoutLevel || null,
         dietType: dietType || null,
         fitnessPhase: fitnessPhase || null,
+        unitSystem: unitSystem || 'metric',
         proteinTarget,
         calorieTarget,
       },
@@ -92,7 +93,7 @@ export async function PATCH(request: Request) {
   try {
     const userId = await getUserId();
     const body = await request.json();
-    const { weight, height, age, gender, activityLevel, goal, workoutLevel, dietType, fitnessPhase } = body;
+    const { weight, height, age, gender, activityLevel, goal, workoutLevel, dietType, fitnessPhase, unitSystem } = body;
 
     const existing = await db.fitnessProfile.findUnique({ where: { userId } });
     if (!existing) {
@@ -129,6 +130,7 @@ export async function PATCH(request: Request) {
         ...(workoutLevel !== undefined && { workoutLevel }),
         ...(dietType !== undefined && { dietType }),
         ...(fitnessPhase !== undefined && { fitnessPhase }),
+        ...(unitSystem !== undefined && { unitSystem }),
         tdee,
         calorieTarget,
         proteinTarget,

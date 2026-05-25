@@ -228,6 +228,7 @@ model FitnessProfile {
   workoutLevel  String?  // beginner, intermediate, advanced
   dietType      String?  // omnivore, vegetarian, vegan, keto, paleo
   fitnessPhase  String?  // start, restart, explore
+  unitSystem    String?  @default("metric") // metric or imperial
   proteinTarget Float?
   calorieTarget Float?
   createdAt     DateTime @default(now())
