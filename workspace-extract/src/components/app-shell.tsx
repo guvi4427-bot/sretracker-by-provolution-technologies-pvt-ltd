@@ -1,0 +1,433 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  Home, BookOpen, Dumbbell, PenTool, Clock, Rss, Trophy, Award,
+  BarChart3, MessageCircle, User, Settings, Menu, Search, Bell,
+  Shield, LogOut, Zap, Compass, X, Send, Bot, Sparkles,
+  Sun, Moon, MessageSquare, Bookmark, Users, UserCheck
+} from 'lucide-react';
+import { signOut } from 'next-auth/react';
+import { XPBar } from '@/components/xp-bar';
+import { StreakBadge } from '@/components/streak-badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { useUserStore } from '@/stores/user-store';
+import { t } from '@/lib/i18n';
+import { useTheme } from 'next-themes';
+
+const BOTTOM_TABS = [
+  { nameKey: 'nav.home', href: '/home', icon: Home },
+  { nameKey: 'nav.feed', href: '/feed', icon: Rss },
+  { nameKey: 'nav.discover', href: '/discover', icon: Compass },
+  { nameKey: 'nav.messages', href: '/messages', icon: MessageCircle },
+  { nameKey: 'nav.more', href: '#more', icon: Menu },
+];
+
+const MORE_ITEMS = [
+  { nameKey: 'nav.learning', href: '/learn', icon: BookOpen },
+  { nameKey: 'nav.fitness', href: '/fitness', icon: Dumbbell },
+  { nameKey: 'nav.content', href: '/content', icon: PenTool },
+  { nameKey: 'nav.time', href: '/time', icon: Clock },
+  { nameKey: 'nav.requests', href: '/follow-requests', icon: UserCheck },
+  { nameKey: 'nav.leaderboard', href: '/leaderboard', icon: Trophy },
+  { nameKey: 'nav.achievements', href: '/achievements', icon: Award },
+  { nameKey: 'nav.analytics', href: '/analytics', icon: BarChart3 },
+  { nameKey: 'nav.notifications', href: '/notifications', icon: Bell },
+  { nameKey: 'nav.friends', href: '/friends', icon: Users },
+  { nameKey: 'nav.profile', href: '/profile', icon: User },
+  { nameKey: 'nav.settings', href: '/settings', icon: Settings },
+  { nameKey: 'feedback.title', href: '/feedback', icon: MessageSquare },
+  { nameKey: 'nav.bookmarks', href: '/feed?tab=bookmarks', icon: Bookmark },
+];
+
+function AppShellInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+  const { profile, fetchProfile, loading } = useUserStore();
+  const { theme, setTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const prevXpRef = useRef<number>(0);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Reusable function to refresh notification count (with cache-busting)
+  const refreshNotificationCount = useCallback(() => {
+    fetch('/api/notifications?unread=true&limit=1&_t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : { total: 0 }).then(d => {
+      setUnreadNotificationCount(typeof d.total === 'number' ? d.total : 0);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (sessionStatus === 'authenticated') {
+      fetchProfile();
+      // Fetch pending follow request count
+      fetch('/api/follow?type=requests').then(r => r.ok ? r.json() : []).then(d => {
+        setPendingRequestCount(Array.isArray(d) ? d.length : 0);
+      }).catch(() => {});
+      // Fetch unread notification count immediately
+      refreshNotificationCount();
+      // Periodic refresh as fallback (every 10s)
+      refreshIntervalRef.current = setInterval(() => {
+        fetchProfile();
+        refreshNotificationCount();
+      }, 10000);
+      return () => { if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current); };
+    } else if (sessionStatus === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [sessionStatus, fetchProfile, router, refreshNotificationCount]);
+
+  // Listen for xp-updated and notification-updated events to immediately refresh notification count
+  useEffect(() => {
+    function handleNotificationRefresh() {
+      refreshNotificationCount();
+    }
+    function handleXpUpdated() {
+      // Call check-eligible and wait for it to complete before refreshing
+      // the notification count. This prevents the race condition where
+      // refreshNotificationCount reads the DB before the write completes.
+      fetch('/api/achievements/check-eligible', { method: 'POST' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.newNotifications > 0) {
+            toast.success('🏆 Achievement ready to claim!', {
+              description: 'Go to achievements to claim it'
+            });
+          }
+          // Refresh ONLY after check-eligible confirms completion
+          refreshNotificationCount();
+        })
+        .catch(() => {
+          // On error still refresh so the bell is not stale
+          refreshNotificationCount();
+        });
+      // Single delayed fallback for edge cases where check-eligible
+      // is slow or the notification was already created by awardXP
+      setTimeout(() => { refreshNotificationCount(); }, 2000);
+    }
+    window.addEventListener('xp-updated', handleXpUpdated);
+    window.addEventListener('notification-updated', handleNotificationRefresh);
+    return () => {
+      window.removeEventListener('xp-updated', handleXpUpdated);
+      window.removeEventListener('notification-updated', handleNotificationRefresh);
+    };
+  }, [refreshNotificationCount]);
+
+  // Refresh notification count when tab becomes visible (catches up after tab switch)
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshNotificationCount();
+        // Also check for any missed achievement notifications
+        fetch('/api/achievements/check-eligible', { method: 'POST' }).then(() => {
+          refreshNotificationCount();
+        }).catch(() => {});
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => { document.removeEventListener('visibilitychange', handleVisibilityChange); };
+  }, [refreshNotificationCount]);
+
+  useEffect(() => {
+    if (profile && prevXpRef.current > 0 && profile.xp > prevXpRef.current) {
+      const gained = profile.xp - prevXpRef.current;
+      toast.success(`+${gained} ${t('xp.earned')}`, { description: t('xp.keepUp') });
+    }
+    if (profile) prevXpRef.current = profile.xp;
+  }, [profile?.xp]);
+
+  useEffect(() => {
+    if (profile && !profile.onboardingComplete && !pathname.startsWith('/onboarding')) {
+      router.push('/onboarding');
+    }
+  }, [profile?.onboardingComplete, pathname, router]);
+
+  const isAdmin = profile?.isAdmin || profile?.isSuperAdmin;
+
+  const isActive = (href: string) => {
+    if (href === '/home' || href === '/') return pathname === '/' || pathname === '/home';
+    return pathname.startsWith(href);
+  };
+
+  const initials = (name?: string | null) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+    const userMsg = { role: 'user', content: chatInput.trim() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const res = await fetch('/api/ai/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg.content, botType: 'general', history: chatMessages.slice(-10) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.response || data.reply || t('ai.assistant') }]);
+      }
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: t('auth.somethingWentWrong') }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+
+  // Loading state
+  if (sessionStatus === 'loading' || (loading && !profile)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+          <Zap className="w-8 h-8 text-blue-400" />
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (sessionStatus === 'unauthenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+          <Zap className="w-8 h-8 text-blue-400" />
+        </motion.div>
+      </div>
+    );
+  }
+
+  const safeProfile = profile || {
+    name: 'User',
+    username: 'user',
+    level: 1,
+    xp: 0,
+    currentStreak: 0,
+    isAdmin: false,
+    isSuperAdmin: false,
+    onboardingComplete: false,
+    activePhases: [],
+    phaseActivityMap: {},
+  };
+
+  // Build More items list with admin button included for admins
+  const visibleMoreItems = isAdmin
+    ? [...MORE_ITEMS, { nameKey: 'nav.admin', href: '/admin', icon: Shield }]
+    : MORE_ITEMS;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Top Header */}
+      <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 glass-glowing">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg gradient-blue flex items-center justify-center"><Zap className="w-3.5 h-3.5 text-white" /></div>
+          <span className="font-bold text-foreground text-sm">S/R/E</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground transition-colors p-2">
+            {mounted && (theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />)}
+          </button>
+          <button onClick={() => router.push('/notifications')} className="relative text-muted-foreground hover:text-foreground transition-colors p-2">
+            <Bell size={18} />
+            {unreadNotificationCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span>
+            )}
+          </button>
+          <Avatar className="h-8 w-8 border border-border cursor-pointer" onClick={() => router.push('/profile')}>
+            <AvatarFallback className="bg-blue-600/30 text-blue-300 dark:text-blue-300 text-xs">{initials(safeProfile.name)}</AvatarFallback>
+          </Avatar>
+        </div>
+      </header>
+
+      {/* Page Content */}
+      <main className="flex-1 p-4 pb-28">
+        <ErrorBoundary>
+          <AnimatePresence mode="wait">
+            <motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </ErrorBoundary>
+        {/* Footer Links */}
+        <div className="mt-8 pt-4 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground/50">
+          <a href="/terms" className="hover:text-muted-foreground transition-colors">Terms & Conditions</a>
+          <span>·</span>
+          <a href="/community-guidelines" className="hover:text-muted-foreground transition-colors">Community Guidelines</a>
+        </div>
+      </main>
+
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-4 left-4 right-4 z-40 max-w-lg mx-auto">
+        <div className="glass-glowing backdrop-blur-2xl bg-background/80 dark:bg-[#0B1120]/70 border border-border rounded-[1.75rem] shadow-lg shadow-blue-900/10 dark:shadow-blue-900/20 px-2">
+          <div className="flex items-center justify-around h-16">
+            {BOTTOM_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = tab.href !== '#more' && isActive(tab.href);
+
+              if (tab.href === '#more') {
+                return (
+                  <Sheet key={tab.nameKey} open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                    <SheetTrigger asChild>
+                      <button className="flex flex-col items-center justify-center gap-0.5 py-1 px-3 text-muted-foreground transition-colors hover:text-foreground rounded-xl">
+                        <Icon size={22} /><span className="text-[10px] font-medium">{t(tab.nameKey)}</span>
+                      </button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="bg-background border-border rounded-t-3xl max-h-[80vh]">
+                      <SheetHeader><SheetTitle className="text-foreground text-left">{t('nav.more')}</SheetTitle></SheetHeader>
+                      <div className="grid grid-cols-3 gap-3 py-3">
+                        {visibleMoreItems.map((item) => {
+                          const ItemIcon = item.icon;
+                          const itemActive = isActive(item.href);
+                          const isAdminItem = item.nameKey === 'nav.admin';
+                          const isRequestsItem = item.nameKey === 'nav.requests';
+                          const isNotifItem = item.nameKey === 'nav.notifications';
+                          const badgeCount = isRequestsItem ? pendingRequestCount : isNotifItem ? unreadNotificationCount : 0;
+                          return (
+                            <button key={item.href} onClick={() => { router.push(item.href); setMobileMenuOpen(false); }}
+                              className={`relative flex flex-col items-center gap-2 rounded-xl p-4 transition-all overflow-hidden ${itemActive ? (isAdminItem ? 'bg-purple-600/20 text-purple-400' : 'bg-blue-600/20 text-blue-400') : (isAdminItem ? 'bg-purple-600/10 text-purple-400/70 hover:bg-purple-600/20' : 'bg-accent text-muted-foreground hover:bg-accent/80')}`}>
+                              <div className="relative">
+                                <ItemIcon size={22} />
+                                {badgeCount > 0 && (
+                                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">{badgeCount > 9 ? '9+' : badgeCount}</span>
+                                )}
+                              </div>
+                              <span className="text-xs font-medium truncate w-full text-center">{t(item.nameKey)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <Separator className="bg-border" />
+                      <button onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); }} className="flex items-center gap-3 w-full p-4 text-muted-foreground hover:bg-accent rounded-lg transition-colors">
+                        {mounted && (theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />)}
+                        <span className="text-sm font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                      </button>
+                      <button onClick={() => { signOut({ redirect: false }).then(() => router.push('/login')); setMobileMenuOpen(false); }}
+                        className="flex items-center gap-3 w-full p-4 text-red-400 hover:bg-red-600/10 rounded-lg transition-colors">
+                        <LogOut size={20} /><span className="text-sm font-medium">{t('nav.signOut')}</span>
+                      </button>
+                    </SheetContent>
+                  </Sheet>
+                );
+              }
+
+              return (
+                <button key={tab.nameKey} onClick={() => router.push(tab.href)}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors rounded-xl ${active ? 'text-blue-400 bg-blue-600/10' : 'text-muted-foreground hover:text-foreground'}`}>
+                  <Icon size={22} /><span className="text-[10px] font-medium">{t(tab.nameKey)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* AI Chat Bubble - positioned above bottom nav */}
+      {!chatOpen ? (
+        <motion.button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-24 right-4 z-[55] w-14 h-14 rounded-full gradient-gold flex items-center justify-center shadow-lg glow-gold glass-glowing"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.5 }}
+        >
+          <Bot size={24} className="text-gray-900" />
+        </motion.button>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="fixed bottom-24 right-4 z-[55] w-[calc(100vw-2rem)] sm:w-[380px] h-[480px] backdrop-blur-2xl bg-background/90 dark:bg-[#0B1120]/80 border border-border flex flex-col overflow-hidden rounded-2xl"
+        >
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center"><Bot size={16} className="text-gray-900" /></div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t('ai.assistant')}</p>
+                <p className="text-[10px] text-muted-foreground">{t('ai.poweredBy')}</p>
+              </div>
+            </div>
+            <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1"><X size={18} /></button>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            {chatMessages.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Sparkles className="w-8 h-8 mx-auto mb-2" />
+                <p className="text-sm">{t('ai.askAnything')}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`flex items-end ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
+                        <Bot size={11} className="text-white" />
+                      </div>
+                    )}
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'gradient-blue text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start items-end">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
+                      <Bot size={11} className="text-white" />
+                    </div>
+                    <div className="bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 rounded-2xl px-4 py-2 text-sm text-muted-foreground border border-violet-400/20 dark:border-violet-400/30">
+                      <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.5 }}>{t('ai.thinking')}</motion.span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+          </ScrollArea>
+          <div className="p-3 border-t border-border">
+            <div className="flex gap-2">
+              <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+                placeholder={t('ai.askAnything')} className="bg-accent border-border text-foreground" />
+              <Button onClick={sendChatMessage} size="icon" className="gradient-gold border-0 shrink-0 text-gray-900" disabled={chatLoading}>
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <AppShellInner>{children}</AppShellInner>
+    </ErrorBoundary>
+  );
+}
