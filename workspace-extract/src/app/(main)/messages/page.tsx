@@ -162,26 +162,31 @@ export default function MessagesPage() {
   useEffect(() => { fetchConversations(); fetchGroups(); setLoading(false); }, [fetchConversations, fetchGroups]);
 
   // Auto-start DM when navigated from friends tab with ?userId=xxx
+  const dmInitRef = useRef(false);
   useEffect(() => {
     const targetUserId = searchParams.get('userId');
-    if (!targetUserId || !profile?.userId) return;
-    // Only run once — remove the param after reading it
-    const timer = setTimeout(async () => {
+    if (!targetUserId || !profile?.userId || dmInitRef.current) return;
+    dmInitRef.current = true; // Prevent re-trigger
+    // Fetch target user's profile FIRST to ensure we have the name
+    (async () => {
       try {
+        // Fetch user profile for display name
+        const userRes = await fetch(`/api/user/public/${targetUserId}`);
+        let otherUser = { id: targetUserId, name: 'User', username: '' };
+        if (userRes.ok) {
+          const ud = await userRes.json();
+          otherUser = { id: targetUserId, name: ud.profile?.name || ud.username || 'User', username: ud.username || '' };
+        }
+
         // Check if conversation already exists
         const convs = await (await fetch('/api/messages')).json();
         const allConvs = Array.isArray(convs) ? convs : convs.conversations || [];
         const existing = allConvs.find((c: any) => c.otherUser?.id === targetUserId);
         if (existing) {
-          openConversation(existing.id, existing.otherUser);
+          // Use the otherUser from our fetch (more reliable name) merged with existing conv data
+          const mergedOtherUser = { ...existing.otherUser, ...otherUser, name: otherUser.name || existing.otherUser?.name || 'User' };
+          openConversation(existing.id, mergedOtherUser);
         } else {
-          // Fetch target user's name first
-          const userRes = await fetch(`/api/user/public/${targetUserId}`);
-          let otherUser = { id: targetUserId, name: 'User', username: '' };
-          if (userRes.ok) {
-            const ud = await userRes.json();
-            otherUser = { id: targetUserId, name: ud.profile?.name || ud.username || 'User', username: ud.username || '' };
-          }
           // Create conversation with a greeting
           const r = await fetch('/api/messages', {
             method: 'POST',
@@ -199,9 +204,7 @@ export default function MessagesPage() {
         // Clean up URL so refresh doesn't re-trigger
         router.replace('/messages', { scroll: false });
       } catch {}
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
   }, [searchParams, profile?.userId]);
 
   // Refetch conversations periodically for DM persistence

@@ -110,8 +110,12 @@ export default function ProfilePage() {
       const r = await fetch('/api/follow?type=count');
       if (r.ok) {
         const d = await r.json();
-        setFollowerCount(d.followersCount || 0);
-        setFollowingCount(d.followingCount || 0);
+        // Only update if server returns valid numbers; never overwrite with 0
+        // if we already have a positive count (DB replication lag protection)
+        const serverFollowers = typeof d.followersCount === 'number' ? d.followersCount : undefined;
+        const serverFollowing = typeof d.followingCount === 'number' ? d.followingCount : undefined;
+        setFollowerCount(prev => serverFollowers !== undefined ? Math.max(serverFollowers, prev) : prev);
+        setFollowingCount(prev => serverFollowing !== undefined ? Math.max(serverFollowing, prev) : prev);
       }
     } catch {}
   }, []);

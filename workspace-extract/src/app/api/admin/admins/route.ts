@@ -84,10 +84,6 @@ export async function DELETE(request: Request) {
     const adminCheck = await requireAdmin();
     if ('error' in adminCheck) return NextResponse.json({ error: adminCheck.error!.message }, { status: adminCheck.error!.status });
 
-    if (!adminCheck.data.isSuperAdmin) {
-      return NextResponse.json({ error: 'Only super-admins can demote admins' }, { status: 403 });
-    }
-
     const body = await request.json();
     const { userId } = body;
 
@@ -103,10 +99,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Admin role not found' }, { status: 404 });
     }
 
+    // Only super admin can demote super admin
     if (targetAdmin.email === SUPER_ADMIN_EMAIL || targetAdmin.isSuperAdmin) {
+      if (!adminCheck.data.isSuperAdmin) {
+        return NextResponse.json({ error: 'Only super-admins can demote super-admin' }, { status: 403 });
+      }
       return NextResponse.json({ error: 'Cannot demote super-admin' }, { status: 403 });
     }
 
+    // Regular admins CAN demote other regular admins
     await db.adminRole.delete({
       where: { userId },
     });

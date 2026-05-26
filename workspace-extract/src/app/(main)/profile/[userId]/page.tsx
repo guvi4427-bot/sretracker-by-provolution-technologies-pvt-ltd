@@ -222,11 +222,11 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        // Update target user's followers count AND own following count from server response
+        // Optimistically update: target +1 follower, and we'll reconcile with server
         setUserData((prev: any) => {
           if (!prev) return prev;
-          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount ?? 0;
-          return { ...prev, followersCount: newFollowers };
+          const serverCount = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : (prev.followersCount ?? 0) + 1;
+          return { ...prev, followersCount: Math.max(serverCount, (prev.followersCount ?? 0) + 1) };
         });
       } else if (data.status === 'pending') {
         setFollowStatus('pending');
