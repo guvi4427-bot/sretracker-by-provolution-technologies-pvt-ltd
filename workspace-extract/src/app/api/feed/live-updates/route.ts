@@ -18,17 +18,14 @@ import { db } from '@/lib/db';
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const myUserId = session.user.id;
+    const isGuest = !session?.user?.id;
+    const myUserId = session?.user?.id || '';
     const { searchParams } = new URL(req.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
     const includeOwn = searchParams.get('includeOwn') !== 'false'; // default true
 
     // ── Get the viewer's accepted following list (for private profile visibility) ──
-    const myFollowing = await db.follow.findMany({
+    const myFollowing = isGuest ? [] : await db.follow.findMany({
       where: { followerId: myUserId, status: 'accepted' },
       select: { followingId: true },
     });
@@ -47,10 +44,11 @@ export async function GET(req: Request) {
     //   - The user is public AND has the relevant share setting ON, OR
     //   - The user is private AND the viewer follows them AND has the relevant share setting ON
     function isVisible(userId: string, isPublic: boolean, shareSetting: boolean): boolean {
-      if (userId === myUserId && includeOwn) return shareSetting;
+      if (!isGuest && userId === myUserId && includeOwn) return shareSetting;
       if (!shareSetting) return false;
       if (isPublic) return true;
-      // Private profile: only visible to followers
+      // Private profile: only visible to followers (guests can't follow anyone)
+      if (isGuest) return false;
       return followingIds.has(userId);
     }
 
@@ -99,7 +97,7 @@ export async function GET(req: Request) {
         sharedAt: t.sharedAt,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
-        isOwn: t.userId === myUserId,
+        isOwn: !isGuest && t.userId === myUserId,
         user: {
           id: t.user.id,
           username: t.user.username,
@@ -141,7 +139,7 @@ export async function GET(req: Request) {
         updatedAt: e.updatedAt,
         createdAt: e.createdAt,
         seriesName: e.series?.name || null,
-        isOwn: e.userId === myUserId,
+        isOwn: !isGuest && e.userId === myUserId,
         user: {
           id: e.user.id,
           username: e.user.username,
@@ -190,7 +188,7 @@ export async function GET(req: Request) {
           loadKg: w.loadKg,
           date: w.date,
           createdAt: w.createdAt,
-          isOwn: w.userId === myUserId,
+          isOwn: !isGuest && w.userId === myUserId,
           user: {
             id: w.user.id,
             username: w.user.username,
@@ -270,7 +268,7 @@ export async function GET(req: Request) {
         weight: w.weight,
         date: w.date,
         createdAt: w.createdAt,
-        isOwn: w.userId === myUserId,
+        isOwn: !isGuest && w.userId === myUserId,
         trendData: trend,
         trendDirection,
         currentWeight,

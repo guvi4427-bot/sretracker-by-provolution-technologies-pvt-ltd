@@ -133,8 +133,9 @@ export default function FeedPage() {
     } catch (e: any) { if (e.name !== 'AbortError') setLoading(false); }
   }, []);
 
-  // Fetch user's own fitness & content data for Live Status tab
+  // Fetch user's own fitness & content data for Live Status tab (auth required)
   const fetchLiveData = useCallback(async () => {
+    if (isGuest) return; // Guests can't access fitness/content APIs
     try {
       const [wRes, wlRes, eRes] = await Promise.all([
         fetch('/api/fitness/workout'),
@@ -941,7 +942,15 @@ export default function FeedPage() {
 
         {/* ═══ LIVE STATUS TAB ═══ */}
         <TabsContent value="live" className="mt-4 space-y-4">
-          {/* Your Fitness Dashboard */}
+          {isGuest && (
+            <GlassCard className="p-4 text-center">
+              <Activity size={24} className="mx-auto mb-2 text-green-400" />
+              <p className="text-sm text-foreground font-medium">Live updates from the community</p>
+              <p className="text-xs text-muted-foreground mt-1">Sign in to track your own fitness and content status.</p>
+            </GlassCard>
+          )}
+          {/* Your Fitness Dashboard — auth only */}
+          {!isGuest && (
           <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Dumbbell size={16} className="text-blue-400" />
@@ -1085,6 +1094,7 @@ export default function FeedPage() {
               </div>
             )}
           </GlassCard>
+          )}
         </TabsContent>
 
         {/* My Posts Tab */}

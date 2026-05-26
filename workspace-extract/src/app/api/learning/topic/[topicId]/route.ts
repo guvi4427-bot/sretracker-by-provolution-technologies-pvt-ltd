@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserId } from '@/lib/auth-helper';
+import { getUserIdOrNull } from '@/lib/auth-helper';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ topicId: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserIdOrNull();
     const { topicId } = await params;
 
     const topic = await db.learningTopic.findUnique({
@@ -26,10 +26,14 @@ export async function GET(
     // Allow access if:
     // 1. User is the owner, OR
     // 2. Topic is shared publicly (isSharedCollection=true AND collectionVisibility=public)
-    const isOwner = topic.userId === userId;
+    const isOwner = userId ? topic.userId === userId : false;
     const isPublicShared = topic.isSharedCollection && topic.collectionVisibility === 'public';
 
     if (!isOwner && !isPublicShared) {
+      // Guests can only see publicly shared topics
+      if (!userId) {
+        return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      }
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 

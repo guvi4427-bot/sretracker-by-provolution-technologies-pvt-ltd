@@ -8,9 +8,64 @@ import { safeJsonParse } from '@/lib/utils';
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const isGuest = !session?.user?.id;
+
+    // Guest access: allow read-only browsing of public posts
+    if (isGuest) {
+      const { searchParams } = new URL(req.url);
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '50');
+      const skip = (page - 1) * limit;
+
+      const [posts, total] = await Promise.all([
+        db.post.findMany({
+          where: {},
+          include: {
+            user: {
+              select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } },
+            },
+            _count: { select: { likes: true, comments: true, reposts: true, bookmarks: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        db.post.count(),
+      ]);
+
+      const formatted = posts.map(p => ({
+        id: p.id,
+        content: p.content,
+        images: safeJsonParse<string[]>(p.images, []),
+        hashtags: safeJsonParse<string[]>(p.hashtags, []),
+        createdAt: p.createdAt,
+        user: {
+          id: p.user.id,
+          username: p.user.username,
+          name: p.user.profile?.name || p.user.username,
+          avatarUrl: p.user.profile?.avatarUrl,
+          verified: p.user.profile?.verified || false,
+        },
+        stats: {
+          likes: p._count.likes,
+          comments: p._count.comments,
+          reposts: p._count.reposts,
+          bookmarks: p._count.bookmarks,
+        },
+        isLiked: false,
+        isBookmarked: false,
+        isReposted: false,
+        isRepost: false,
+      }));
+
+      return NextResponse.json({
+        posts: formatted,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      });
     }
+
+    // Authenticated user flow
+    const myUserId = session.user.id;
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -23,7 +78,7 @@ export async function GET(req: NextRequest) {
     if (mine) {
       const [myPosts, myReposts] = await Promise.all([
         db.post.findMany({
-          where: { userId: session.user.id },
+          where: { userId: myUserId },
           include: {
             user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
             _count: { select: { likes: true, comments: true, reposts: true, bookmarks: true } },
@@ -31,7 +86,7 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: 'desc' },
         }),
         db.repost.findMany({
-          where: { userId: session.user.id },
+          where: { userId: myUserId },
           include: {
             post: {
               include: {
@@ -113,15 +168,15 @@ export async function GET(req: NextRequest) {
 
     if (filter === 'following') {
       const following = await db.follow.findMany({
-        where: { followerId: session.user.id, status: 'accepted' },
+        where: { followerId: myUserId, status: 'accepted' },
         select: { followingId: true },
       });
       const followingIds = following.map(f => f.followingId);
-      followingIds.push(session.user.id);
+      followingIds.push(myUserId);
       where.userId = { in: followingIds };
     } else if (filter === 'bookmarked') {
       const bookmarks = await db.postBookmark.findMany({
-        where: { userId: session.user.id },
+        where: { userId: myUserId },
         select: { postId: true },
       });
       where.id = { in: bookmarks.map(b => b.postId) };
@@ -135,9 +190,9 @@ export async function GET(req: NextRequest) {
             select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } },
           },
           _count: { select: { likes: true, comments: true, reposts: true, bookmarks: true } },
-          likes: { where: { userId: session.user.id }, select: { id: true } },
-          bookmarks: { where: { userId: session.user.id }, select: { id: true } },
-          reposts: { where: { userId: session.user.id }, select: { id: true } },
+          likes: { where: { userId: myUserId }, select: { id: true } },
+          bookmarks: { where: { userId: myUserId }, select: { id: true } },
+          reposts: { where: { userId: myUserId }, select: { id: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,

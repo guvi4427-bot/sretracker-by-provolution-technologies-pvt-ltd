@@ -25,6 +25,7 @@ const GUEST_ALLOWED_API_PATHS = [
   "/api/discover",
   "/api/user/public",
   "/api/posts",      // GET only — POST is blocked at the API level
+  "/api/learning/topic",  // GET only — for shared topic viewing
 ];
 
 export async function middleware(request: NextRequest) {

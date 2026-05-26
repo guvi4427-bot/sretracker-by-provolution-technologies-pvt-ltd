@@ -18,6 +18,7 @@ import { safeJsonParse } from '@/lib/utils';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { WeightChart, WorkoutChart } from '@/app/(main)/fitness/_charts';
+import { useGuest } from '@/components/guest-guard';
 
 const phaseConfig: Record<string, { icon: any; color: string; bg: string; nameKey: string }> = {
   start: { icon: Zap, color: 'text-blue-400', bg: 'bg-blue-600/20', nameKey: 'phase.start' },
@@ -77,6 +78,7 @@ export default function PublicProfilePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { profile: myProfile } = useUserStore();
+  const { isGuest, showLoginPrompt } = useGuest();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [followersOpen, setFollowersOpen] = useState(false);
@@ -137,6 +139,9 @@ export default function PublicProfilePage() {
     const profileData = userData.profile || userData;
 
     async function fetchSharedData() {
+      // Guests cannot access fitness/content APIs (auth required), skip shared data
+      if (isGuest) return;
+
       // For private accounts: only show shared data to accepted followers
       // For public accounts: show shared data to everyone if toggle is ON
       const isPrivateAccount = profileData.isPublic === false;
@@ -172,7 +177,7 @@ export default function PublicProfilePage() {
 
   // Check follow status (accepted or pending)
   useEffect(() => {
-    if (!userId || !myProfile) return;
+    if (!userId || !myProfile || isGuest) return;
     async function check() {
       try {
         // Check if we're already following (accepted)
@@ -202,6 +207,7 @@ export default function PublicProfilePage() {
   }, [userId, myProfile]);
 
   async function handleFollow() {
+    if (isGuest) { showLoginPrompt('follow users'); return; }
     try {
       const r = await fetch('/api/follow', {
         method: 'POST',
@@ -272,6 +278,7 @@ export default function PublicProfilePage() {
   }
 
   async function submitReport() {
+    if (isGuest) { showLoginPrompt('report users'); return; }
     if (!reportCategory || !reportReason.trim()) {
       toast.error('Please fill in all fields');
       return;

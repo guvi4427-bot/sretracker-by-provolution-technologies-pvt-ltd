@@ -7,19 +7,19 @@ import { safeJsonParse } from '@/lib/utils';
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const myUserId = session.user.id;
-    const { searchParams } = new URL(req.url);
-    const type = searchParams.get('type') || 'users';
-    const q = (searchParams.get('q') || '').toLowerCase();
+    const isGuest = !session?.user?.id;
+    const myUserId = session?.user?.id || '';
 
     // Get viewer's accepted following list for private profile visibility
-    const myFollowing = await db.follow.findMany({
+    const myFollowing = isGuest ? [] : await db.follow.findMany({
       where: { followerId: myUserId, status: 'accepted' },
       select: { followingId: true },
     });
     const followingIds = new Set(myFollowing.map(f => f.followingId));
+
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type') || 'users';
+    const q = (searchParams.get('q') || '').toLowerCase();
 
     if (type === 'posts') {
       const posts = await db.post.findMany({
@@ -30,15 +30,15 @@ export async function GET(req: Request) {
         include: {
           user: { select: { id: true, username: true, profile: { select: { name: true, avatarUrl: true, verified: true } } } },
           _count: { select: { likes: true, comments: true, reposts: true } },
-          likes: { where: { userId: myUserId }, select: { id: true } },
-          reposts: { where: { userId: myUserId }, select: { id: true } },
+          ...(!isGuest ? { likes: { where: { userId: myUserId }, select: { id: true } } } : {}),
+          ...(!isGuest ? { reposts: { where: { userId: myUserId }, select: { id: true } } } : {}),
         },
       });
       const formatted = posts.map(p => ({
         id: p.id, content: p.content, hashtags: safeJsonParse<string[]>(p.hashtags, []), createdAt: p.createdAt,
         user: { id: p.user.id, username: p.user.username, name: p.user.profile?.name || p.user.username, avatarUrl: p.user.profile?.avatarUrl, verified: p.user.profile?.verified || false },
         stats: { likes: p._count.likes, comments: p._count.comments, reposts: p._count.reposts },
-        isLiked: p.likes.length > 0, isReposted: p.reposts.length > 0,
+        isLiked: !isGuest && (p as any).likes?.length > 0, isReposted: !isGuest && (p as any).reposts?.length > 0,
       }));
       return NextResponse.json({ posts: formatted });
     }
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     if (type === 'users') {
       const profiles = await db.profile.findMany({
         where: {
-          userId: { not: myUserId },
+          ...(!isGuest ? { userId: { not: myUserId } } : {}),
           ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { user: { username: { contains: q, mode: 'insensitive' } } }] } : {}),
           isPublic: true,
         },
@@ -54,13 +54,13 @@ export async function GET(req: Request) {
         include: { user: { select: { id: true, username: true } } },
       });
 
-      const follows = await db.follow.findMany({ where: { followerId: myUserId }, select: { followingId: true, status: true } });
+      const follows = isGuest ? [] : await db.follow.findMany({ where: { followerId: myUserId }, select: { followingId: true, status: true } });
       const followMap = new Map(follows.map(f => [f.followingId, f.status]));
 
       const users = profiles.map(p => ({
         id: p.user.id, name: p.name || p.user.username, username: p.user.username, avatarUrl: p.avatarUrl,
         xp: p.xp, level: p.level, activePhases: safeJsonParse<string[]>(p.activePhases, []), verified: p.verified,
-        isFollowing: followMap.get(p.user.id) === 'accepted', followRequestStatus: followMap.get(p.user.id) || 'none', isPublic: p.isPublic,
+        isFollowing: !isGuest && followMap.get(p.user.id) === 'accepted', followRequestStatus: isGuest ? 'none' : (followMap.get(p.user.id) || 'none'), isPublic: p.isPublic,
       }));
       return NextResponse.json({ users });
     }
@@ -114,9 +114,11 @@ export async function GET(req: Request) {
 
       // Helper: check visibility for a user's update
       function isVisible(userId: string, isPublic: boolean, shareSetting: boolean): boolean {
-        if (userId === myUserId) return shareSetting;
+        if (!isGuest && userId === myUserId) return shareSetting;
         if (!shareSetting) return false;
         if (isPublic) return true;
+        // Guests can't follow, so private profiles are invisible to them
+        if (isGuest) return false;
         return followingIds.has(userId);
       }
 
@@ -136,7 +138,7 @@ export async function GET(req: Request) {
         sharedTopics.filter(t => isVisible(t.userId, t.user.profile?.isPublic !== false, t.user.profile?.shareLearningProgress === true)).forEach(t => {
           results.push({
             id: t.id, type: 'learning_update', name: t.name, phase: t.phase, entryCount: t._count.entries,
-            sharedAt: t.sharedAt, updatedAt: t.updatedAt, createdAt: t.createdAt, isOwn: t.userId === myUserId,
+            sharedAt: t.sharedAt, updatedAt: t.updatedAt, createdAt: t.createdAt, isOwn: !isGuest && t.userId === myUserId,
             user: { id: t.user.id, username: t.user.username, name: t.user.profile?.name || t.user.username, avatarUrl: t.user.profile?.avatarUrl, verified: t.user.profile?.verified || false },
             hashtags: ['learning', t.phase || 'study'],
           });
@@ -156,7 +158,7 @@ export async function GET(req: Request) {
         contentEntries.filter(e => isVisible(e.userId, e.user.profile?.isPublic !== false, e.user.profile?.shareContentStatus === true)).forEach(e => {
           results.push({
             id: e.id, type: 'content_update', title: e.title, contentType: e.contentType, liveStatus: e.liveStatus,
-            status: e.status, updatedAt: e.updatedAt, createdAt: e.createdAt, seriesName: e.series?.name || null, isOwn: e.userId === myUserId,
+            status: e.status, updatedAt: e.updatedAt, createdAt: e.createdAt, seriesName: e.series?.name || null, isOwn: !isGuest && e.userId === myUserId,
             user: { id: e.user.id, username: e.user.username, name: e.user.profile?.name || e.user.username, avatarUrl: e.user.profile?.avatarUrl, verified: e.user.profile?.verified || false },
             hashtags: ['content', 'progress'],
           });
@@ -181,7 +183,7 @@ export async function GET(req: Request) {
           results.push({
             id: w.id, type: 'fitness_update', subType: 'workout', workoutType: w.workoutType, duration: w.duration,
             estimatedCalories: w.estimatedCalories, muscleGroup: w.muscleGroup, sets: w.sets, reps: w.reps, loadKg: w.loadKg,
-            date: w.date, createdAt: w.createdAt, isOwn: w.userId === myUserId,
+            date: w.date, createdAt: w.createdAt, isOwn: !isGuest && w.userId === myUserId,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });
@@ -234,7 +236,7 @@ export async function GET(req: Request) {
           const currentWeight = currentWeightMap.get(w.userId) || null;
           results.push({
             id: w.id, type: 'fitness_update', subType: 'weight', weight: w.weight, date: w.date,
-            createdAt: w.createdAt, isOwn: w.userId === myUserId, trendData: trend, trendDirection, currentWeight,
+            createdAt: w.createdAt, isOwn: !isGuest && w.userId === myUserId, trendData: trend, trendDirection, currentWeight,
             user: { id: w.user.id, username: w.user.username, name: (w.user as any).profile?.name || w.user.username, avatarUrl: (w.user as any).profile?.avatarUrl, verified: (w.user as any).profile?.verified || false, fitnessGoal: goal },
             hashtags: tags,
           });
