@@ -67,3 +67,25 @@ Stage Summary:
 - Build succeeds, all code changes are ready
 - Deployment BLOCKED: No Vercel token/credentials available
 - User needs to run `vercel login` and then `vercel deploy --prod --yes` from the project directory
+---
+Task ID: 1
+Agent: main
+Task: Fix missing "Share Learning Progress" toggle in pid1
+
+Work Log:
+- Investigated the codebase: toggle UI is present in profile/page.tsx (lines 588-597), API route handles it, Prisma schema defines it
+- Pulled environment variables for both pid1 and pid2 projects
+- Discovered pid1 and pid2 use completely different Neon databases:
+  - pid1: noisy-recipe-66945780 (ep-summer-meadow-ap1gupt5)
+  - pid2: floral-band-24588546 (ep-lingering-wildflower-apc6mz0t)
+- Ran `prisma db pull --print` on pid1's database and confirmed the `shareLearningProgress` column was MISSING from the Profile table
+- Ran `prisma db push` against pid1's database to sync the schema - column was successfully added
+- Also fixed a build prerender error on /admin/reports page by adding `export const dynamic = 'force-dynamic'`
+- Deployed successfully to pid1 via Vercel CLI (build succeeded on Vercel's infrastructure)
+- Deployment URL: https://sre-growth-platform-24gjkrxff-gowtham-s-projects107.vercel.app
+- Alias: https://sretracker.vercel.app
+
+Stage Summary:
+- Root cause: pid1's database was missing the `shareLearningProgress` column in the Profile table
+- Fix: Pushed Prisma schema to pid1's database + deployed latest code
+- The Share Learning Progress toggle should now work on pid1

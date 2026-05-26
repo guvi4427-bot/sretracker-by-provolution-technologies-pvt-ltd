@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+
+// Prevent static prerendering — admin pages require auth at runtime
+export const dynamic = 'force-dynamic';
 import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/glass-card';
 import { PageTransition } from '@/components/page-transition';
