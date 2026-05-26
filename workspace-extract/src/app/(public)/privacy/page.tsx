@@ -1,6 +1,14 @@
 import { Zap, Shield, Eye, Database, Cookie, Globe, Lock, Users, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site-config';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description: `Read the Privacy Policy for ${SITE_NAME}. Learn how we collect, use, and protect your data on our gamified self-growth platform.`,
+  alternates: { canonical: `${SITE_URL}/privacy` },
+};
 
 export default function PrivacyPolicyPage() {
   return (

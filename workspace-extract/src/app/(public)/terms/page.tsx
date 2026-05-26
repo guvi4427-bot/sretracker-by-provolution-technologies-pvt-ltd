@@ -1,6 +1,14 @@
 import { Zap, FileText, Scale, DollarSign, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site-config';
+
+export const metadata: Metadata = {
+  title: 'Terms & Conditions',
+  description: `Read the Terms and Conditions for ${SITE_NAME}, the free gamified self-growth platform for fitness tracking, learning progression, and community.`,
+  alternates: { canonical: `${SITE_URL}/terms` },
+};
 
 export default function TermsPage() {
   return (

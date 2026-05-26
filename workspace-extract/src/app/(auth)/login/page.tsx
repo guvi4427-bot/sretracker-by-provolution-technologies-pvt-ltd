@@ -5,7 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Eye, Compass } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -69,6 +69,13 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGuest() {
+    // Set guest cookie (expires in 24 hours)
+    document.cookie = 'sre_guest=true; path=/; max-age=86400; SameSite=Lax';
+    localStorage.setItem('sre_guest', 'true');
+    router.push('/feed');
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -127,6 +134,24 @@ export default function LoginPage() {
         </form>
 
         <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <span className="relative bg-card px-3 text-xs text-muted-foreground mx-auto flex w-fit">or</span>
+        </div>
+
+        <Button
+          onClick={handleGuest}
+          variant="outline"
+          className="w-full border-border text-foreground font-medium h-11 rounded-lg hover:bg-accent transition-colors"
+        >
+          <Eye size={18} className="mr-2 text-muted-foreground" /> Continue as Guest
+        </Button>
+        <p className="text-center text-[11px] text-muted-foreground/60 mt-2">
+          Browse feed and discover. Sign in to interact.
+        </p>
+
+        <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border" />
           </div>

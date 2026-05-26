@@ -4,6 +4,15 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
 import { CookieConsent } from "@/components/cookie-consent";
+import {
+  SITE_NAME,
+  SITE_URL,
+  SITE_SHORT_NAME,
+  SITE_TAGLINE,
+  SITE_DESCRIPTION,
+  SITE_CREATOR,
+  SITE_KEYWORDS,
+} from "@/lib/site-config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,28 +25,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "S/R/E — Gamified Self-Growth Platform",
-  description:
-    "S/R/E (Start / Restart / Explore) is a free gamified self-growth platform that helps you build better habits, track your Study, Routine, and Exercise progress. Earn XP, unlock achievements, and join a supportive community on your self-improvement journey.",
-  keywords: [
-    "SRE",
-    "self-growth",
-    "gamification",
-    "habit tracker",
-    "learning",
-    "fitness",
-    "productivity",
-    "study tracker",
-    "exercise tracker",
-    "routine builder",
-    "personal development",
-    "gamified habits",
-    "XP system",
-    "achievement tracker",
-  ],
-  authors: [{ name: "Gowtham", url: "https://sretracker.vercel.app" }],
-  creator: "Gowtham",
-  publisher: "S/R/E",
+  title: {
+    default: `${SITE_NAME} — Gamified Self-Growth Platform`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  authors: [{ name: SITE_CREATOR, url: SITE_URL }],
+  creator: SITE_CREATOR,
+  publisher: SITE_NAME,
   icons: {
     icon: [
       { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
@@ -45,24 +41,22 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  metadataBase: new URL("https://sretracker.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   alternates: {
-    canonical: "https://sretracker.vercel.app",
+    canonical: SITE_URL,
   },
   openGraph: {
-    title: "S/R/E — Gamified Self-Growth Platform",
-    description:
-      "Start / Restart / Explore — Your gamified journey to self-improvement. Track habits, earn XP, and grow with a community.",
+    title: `${SITE_NAME} — Gamified Self-Growth Platform`,
+    description: `${SITE_SHORT_NAME} (${SITE_TAGLINE}) — Your gamified journey to self-improvement. Track fitness, learning, and content creation with XP, achievements, and a progression-focused community.`,
     type: "website",
-    url: "https://sretracker.vercel.app",
-    siteName: "S/R/E",
+    url: SITE_URL,
+    siteName: SITE_NAME,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "S/R/E — Gamified Self-Growth Platform",
-    description:
-      "Track your Study, Routine, and Exercise habits with XP, achievements, and a supportive community.",
+    title: `${SITE_NAME} — Gamified Self-Growth Platform`,
+    description: `Track your fitness, learning, and content creation habits with XP, achievements, and a supportive community on ${SITE_NAME}.`,
   },
   robots: {
     index: true,
@@ -86,10 +80,9 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: "S/R/E — Gamified Self-Growth Platform",
-    description:
-      "A free gamified self-growth platform that helps you build better habits, track your Study, Routine, and Exercise progress with XP, achievements, and community support.",
-    url: "https://sretracker.vercel.app",
+    name: `${SITE_NAME} — Gamified Self-Growth Platform`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
     applicationCategory: "LifestyleApplication",
     operatingSystem: "Web",
     offers: {
@@ -99,15 +92,16 @@ export default function RootLayout({
     },
     author: {
       "@type": "Person",
-      name: "Gowtham",
+      name: SITE_CREATOR,
     },
     featureList: [
-      "Habit tracking with daily check-ins",
-      "Gamification with XP, levels, and achievements",
-      "Fitness progress tracking",
-      "Learning and content management",
-      "Social features and community feed",
-      "AI-powered chatbot assistant",
+      "Fitness tracking with calorie counting and workout logs",
+      "Learning progression with topics and entry logs",
+      "Content creation tracking with series and publishing",
+      "Gamification with XP, levels, streaks, and achievements",
+      "Consistency systems with daily quests and reminders",
+      "Progression-focused social community with feed and discover",
+      "AI-powered chatbot assistant for guidance",
     ],
   };
 
@@ -115,9 +109,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-adsense-account" content="ca-pub-7745236489664493" />
-        <link rel="manifest" href="/site.webmanifest" />
+        <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="theme-color" content="#0f172a" />
+        <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
+        <meta name="application-name" content={SITE_NAME} />
         <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7745236489664493"

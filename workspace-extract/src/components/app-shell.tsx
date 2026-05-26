@@ -24,6 +24,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Logo, LogoSpinner } from '@/components/logo';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
+import { SITE_NAME } from '@/lib/site-config';
 import { useTheme } from 'next-themes';
 
 const BOTTOM_TABS = [
@@ -196,7 +197,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   if (sessionStatus === 'loading' || (loading && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <LogoSpinner size={56} label="Loading S/R/E..." />
+        <LogoSpinner size={56} label={`Loading ${SITE_NAME}...`} />
       </div>
     );
   }

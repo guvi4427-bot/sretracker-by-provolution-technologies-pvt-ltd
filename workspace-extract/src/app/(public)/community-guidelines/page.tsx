@@ -1,6 +1,14 @@
 import { Zap, Heart, Shield, Users, MessageCircle, AlertTriangle, Scale, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site-config';
+
+export const metadata: Metadata = {
+  title: 'Community Guidelines',
+  description: `Read the Community Guidelines for ${SITE_NAME}. Help us maintain a supportive, respectful, and growth-oriented community for everyone.`,
+  alternates: { canonical: `${SITE_URL}/community-guidelines` },
+};
 
 export default function CommunityGuidelinesPage() {
   return (

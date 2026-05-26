@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { WeightChart, WorkoutChart } from '@/app/(main)/fitness/_charts';
+import { useGuest } from '@/components/guest-guard';
 
 // ── Shared Topic CTA Button ──
 function SharedTopicCTA({ topicId, router }: { topicId: string; router: ReturnType<typeof useRouter> }) {
@@ -93,6 +94,7 @@ const contentTypeLabel = (type: string) => {
 export default function FeedPage() {
   const router = useRouter();
   const { profile } = useUserStore();
+  const { isGuest, showLoginPrompt } = useGuest();
   const [posts, setPosts] = useState<any[]>([]);
   const [newContent, setNewContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -659,6 +661,7 @@ export default function FeedPage() {
   ).map(([date, calories]) => ({ date, calories })).slice(-14);
 
   async function createPost() {
+    if (isGuest) { showLoginPrompt('create posts'); return; }
     if (!newContent.trim()) return;
     setSubmitting(true);
     const hashtags = (newContent.match(/#(\w+)/g) || []).map((h: string) => h.slice(1));
@@ -670,6 +673,7 @@ export default function FeedPage() {
   }
 
   async function toggleLike(postId: string, isLiked: boolean) {
+    if (isGuest) { showLoginPrompt('like posts'); return; }
     try {
       if (isLiked) {
         await fetch(`/api/posts/${postId}/like`, { method: 'DELETE' });
@@ -681,6 +685,7 @@ export default function FeedPage() {
   }
 
   async function toggleBookmark(postId: string, isBookmarked: boolean) {
+    if (isGuest) { showLoginPrompt('bookmark posts'); return; }
     try {
       if (isBookmarked) {
         await fetch(`/api/posts/${postId}/bookmark`, { method: 'DELETE' });
@@ -692,6 +697,7 @@ export default function FeedPage() {
   }
 
   async function toggleRepost(postId: string, isReposted: boolean) {
+    if (isGuest) { showLoginPrompt('repost'); return; }
     try {
       if (isReposted) {
         await fetch(`/api/posts/${postId}/repost`, { method: 'DELETE' });
@@ -703,6 +709,7 @@ export default function FeedPage() {
   }
 
   async function addComment(postId: string) {
+    if (isGuest) { showLoginPrompt('comment on posts'); return; }
     if (!commentText.trim()) return;
     try {
       const r = await fetch(`/api/posts/${postId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: commentText }) });
@@ -867,12 +874,13 @@ export default function FeedPage() {
         <TabsList className="bg-accent border border-border w-full flex">
           <TabsTrigger value="feed" className="text-muted-foreground data-[state=active]:text-blue-400 flex-1"><Rss size={14} className="mr-1" />Feed</TabsTrigger>
           <TabsTrigger value="live" className="text-muted-foreground data-[state=active]:text-green-400 flex-1"><Activity size={14} className="mr-1" />Live</TabsTrigger>
-          <TabsTrigger value="myposts" className="text-muted-foreground data-[state=active]:text-blue-400 flex-1"><FileText size={14} className="mr-1" />{t('feed.myPosts')}</TabsTrigger>
-          <TabsTrigger value="bookmarks" className="text-muted-foreground data-[state=active]:text-amber-400 flex-1"><Bookmark size={14} className="mr-1" />{t('feed.bookmarks')}</TabsTrigger>
+          {!isGuest && <TabsTrigger value="myposts" className="text-muted-foreground data-[state=active]:text-blue-400 flex-1"><FileText size={14} className="mr-1" />{t('feed.myPosts')}</TabsTrigger>}
+          {!isGuest && <TabsTrigger value="bookmarks" className="text-muted-foreground data-[state=active]:text-amber-400 flex-1"><Bookmark size={14} className="mr-1" />{t('feed.bookmarks')}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="feed" className="mt-4 space-y-4">
-      {/* Create Post */}
+      {/* Create Post — hidden for guests */}
+      {!isGuest && (
       <GlassCard variant="glassmorphism" className="p-4">
         <Textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder={t('feed.createPost')} className="bg-white/5 border-border text-foreground placeholder:text-muted-foreground/60 min-h-[80px]" rows={3} />
         <div className="flex items-center justify-between mt-2">
@@ -880,6 +888,7 @@ export default function FeedPage() {
           <Button onClick={createPost} disabled={submitting} className="gradient-blue text-xs">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('common.submit')}</Button>
         </div>
       </GlassCard>
+      )}
 
       {/* ═══ LIVE UPDATE SECTIONS (grouped by hashtags) ═══ */}
       {mergedFeedItems.orderedGroups.map(([tag, items]) => {

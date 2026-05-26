@@ -1,6 +1,19 @@
 import { Zap, Target, Sparkles, Code, Heart, Users, Rocket, Lightbulb, Shield, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site-config';
+
+export const metadata: Metadata = {
+  title: 'About',
+  description: `Learn about ${SITE_NAME} — a free gamified self-growth platform for fitness tracking, learning progression, content creation tracking, and a progression-focused social community. Start, Restart, and Explore your journey.`,
+  alternates: { canonical: `${SITE_URL}/about` },
+  openGraph: {
+    title: `About ${SITE_NAME}`,
+    description: `${SITE_NAME} helps you build better habits with gamification, community, and AI-powered tools. Track fitness, learning, and content creation.`,
+    url: `${SITE_URL}/about`,
+  },
+};
 
 export default function AboutPage() {
   return (

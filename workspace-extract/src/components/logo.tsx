@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { SITE_NAME, SITE_SHORT_NAME } from '@/lib/site-config';
 
 interface LogoProps {
   size?: number;
@@ -10,23 +11,23 @@ interface LogoProps {
 }
 
 /**
- * S/R/E Logo component — uses the official favicon across the entire UI.
+ * Logo component — uses the official favicon across the entire UI.
  * - `size` controls the image dimension (default 32)
- * - `showText` appends the "S/R/E" brand text
+ * - `showText` appends the brand text
  */
 export function Logo({ size = 32, className = '', showText = false }: LogoProps) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <Image
         src="/favicon-96x96.png"
-        alt="S/R/E"
+        alt={SITE_NAME}
         width={size}
         height={size}
         className="rounded-lg object-cover"
         priority
       />
       {showText && (
-        <span className="font-bold text-foreground text-sm">S/R/E</span>
+        <span className="font-bold text-foreground text-sm">{SITE_SHORT_NAME}</span>
       )}
     </div>
   );
@@ -59,7 +60,7 @@ export function LogoSpinner({ size = 48, className = '', label = 'Loading...' }:
       >
         <Image
           src="/favicon-96x96.png"
-          alt="S/R/E"
+          alt={SITE_NAME}
           width={size}
           height={size}
           className="rounded-xl object-cover"
@@ -97,7 +98,7 @@ export function LogoMiniSpinner({ size = 20, className = '' }: { size?: number; 
     >
       <Image
         src="/favicon-96x96.png"
-        alt=""
+        alt={SITE_NAME}
         width={size}
         height={size}
         className="rounded object-cover"

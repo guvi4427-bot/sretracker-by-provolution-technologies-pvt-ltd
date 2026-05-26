@@ -2,7 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/terms", "/privacy", "/about", "/contact", "/community-guidelines", "/api/auth", "/api/health", "/_next", "/favicon", "/favicon-96x96.png", "/favicon.ico", "/apple-touch-icon.png", "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png", "/site.webmanifest", "/public", "/logo.svg", "/logo.png", "/ads.txt", "/robots.txt", "/sitemap.xml"];
+// Paths that are always public (no auth required)
+const PUBLIC_PATHS = [
+  "/login", "/signup", "/terms", "/privacy", "/about", "/contact",
+  "/community-guidelines", "/api/auth", "/api/health", "/_next",
+  "/favicon", "/favicon-96x96.png", "/favicon.ico", "/apple-touch-icon.png",
+  "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
+  "/manifest.webmanifest", "/site.webmanifest", "/public",
+  "/logo.svg", "/logo.png", "/ads.txt", "/robots.txt", "/sitemap.xml",
+];
+
+// Paths that guests can browse (read-only, no interaction)
+const GUEST_ALLOWED_PATHS = [
+  "/feed",
+  "/discover",
+  "/shared-topic",
+];
+
+// API routes that guests can access (read-only public data)
+const GUEST_ALLOWED_API_PATHS = [
+  "/api/feed",
+  "/api/discover",
+  "/api/user/public",
+  "/api/posts",      // GET only — POST is blocked at the API level
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,33 +36,74 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow static files
-  if (pathname.includes("_next/static") || pathname.includes("_next/image") || pathname.includes("favicon") || pathname.includes("logo.svg") || pathname.includes("logo.png") || pathname.endsWith(".txt") || pathname.endsWith(".xml") || pathname.endsWith(".webmanifest") || pathname.endsWith(".ico")) {
+  if (
+    pathname.includes("_next/static") ||
+    pathname.includes("_next/image") ||
+    pathname.includes("favicon") ||
+    pathname.includes("logo.svg") ||
+    pathname.includes("logo.png") ||
+    pathname.endsWith(".txt") ||
+    pathname.endsWith(".xml") ||
+    pathname.endsWith(".webmanifest") ||
+    pathname.endsWith(".ico")
+  ) {
     return NextResponse.next();
   }
 
   try {
-    const secret = process.env.NEXTAUTH_SECRET || 'sre-platform-insecure-secret-please-set-nextauth-secret-env';
+    const secret =
+      process.env.NEXTAUTH_SECRET ||
+      "sre-platform-insecure-secret-please-set-nextauth-secret-env";
     const token = await getToken({ req: request, secret });
 
-    if (!token) {
+    // Check for guest mode (via cookie)
+    const isGuest = request.cookies.get("sre_guest")?.value === "true";
+
+    if (!token && !isGuest) {
+      // Not authenticated and not a guest — redirect to login
       const loginUrl = new URL("/login", request.url);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Admin route guard - only admins can access /admin and /api/admin
-    if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-      if (!token.isAdmin) {
-        return NextResponse.redirect(new URL("/home", request.url));
+    if (!token && isGuest) {
+      // Guest user — allow only specific paths
+      const isGuestAllowedPath =
+        GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) ||
+        pathname.startsWith("/profile/");
+
+      const isGuestAllowedApi =
+        GUEST_ALLOWED_API_PATHS.some((p) => pathname.startsWith(p)) &&
+        request.method === "GET";
+
+      // Block guest access to restricted paths
+      if (!isGuestAllowedPath && !isGuestAllowedApi) {
+        const loginUrl = new URL("/login", request.url);
+        return NextResponse.redirect(loginUrl);
       }
+
+      // Guest accessing allowed path — inject guest header for API-level checks
+      const response = NextResponse.next();
+      response.headers.set("x-guest", "true");
+      return response;
+    }
+
+    // Admin route guard — only admins can access /admin and /api/admin
+    if (
+      (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) &&
+      !token?.isAdmin
+    ) {
+      return NextResponse.redirect(new URL("/home", request.url));
     }
 
     return NextResponse.next();
   } catch (error) {
-    // Graceful handling - allow through rather than crash
+    // Graceful handling — allow through rather than crash
     return NextResponse.next();
   }
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon|public|logo.svg|logo.png|site.webmanifest|apple-touch-icon|web-app-manifest).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon|public|logo.svg|logo.png|manifest.webmanifest|site.webmanifest|apple-touch-icon|web-app-manifest).*)",
+  ],
 };

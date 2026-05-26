@@ -1,5 +1,7 @@
-export const APP_NAME = "S/R/E";
-export const APP_DESCRIPTION = "Start / Restart / Explore — Gamified Self-Growth Platform";
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site-config";
+
+export const APP_NAME = SITE_NAME;
+export const APP_DESCRIPTION = `${SITE_TAGLINE} — Gamified Self-Growth Platform`;
 export const APP_VERSION = "2.0.0";
 
 export const NAV_ITEMS = [

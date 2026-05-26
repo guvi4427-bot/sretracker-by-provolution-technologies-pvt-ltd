@@ -1,6 +1,19 @@
 import { Zap, Mail, Camera, Tv, MessageCircle, Clock, Send } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site-config';
+
+export const metadata: Metadata = {
+  title: 'Contact',
+  description: `Get in touch with the ${SITE_NAME} team. Reach out for support, partnerships, feature requests, or general inquiries about our gamified self-growth platform.`,
+  alternates: { canonical: `${SITE_URL}/contact` },
+  openGraph: {
+    title: `Contact ${SITE_NAME}`,
+    description: `Reach out to the ${SITE_NAME} team for support, partnerships, or feedback.`,
+    url: `${SITE_URL}/contact`,
+  },
+};
 
 export default function ContactPage() {
   return (

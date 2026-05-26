@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
+import { useGuest } from '@/components/guest-guard';
 
 const TABS = ['posts', 'topics', 'groups', 'users'];
 
@@ -65,6 +66,7 @@ const contentTypeLabel = (type: string) => {
 export default function DiscoverPage() {
   const router = useRouter();
   const { profile } = useUserStore();
+  const { isGuest, showLoginPrompt } = useGuest();
   const [activeTab, setActiveTab] = useState('posts');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any>({ posts: [], topics: [], groups: [], users: [] });
@@ -147,6 +149,7 @@ export default function DiscoverPage() {
   }, []);
 
   async function followUser(userId: string) {
+    if (isGuest) { showLoginPrompt('follow users'); return; }
     try {
       const r = await fetch('/api/follow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
       if (r.ok) {
@@ -173,6 +176,7 @@ export default function DiscoverPage() {
   }
 
   async function joinGroup(groupId: string) {
+    if (isGuest) { showLoginPrompt('join groups'); return; }
     setJoinLoading(groupId);
     try {
       const r = await fetch(`/api/groups/${groupId}/join`, { method: 'POST' });

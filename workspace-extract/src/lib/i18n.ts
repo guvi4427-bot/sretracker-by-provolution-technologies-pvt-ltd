@@ -1,10 +1,12 @@
 type TranslationKey = string;
 type Translations = Record<string, Record<string, string>>;
 
+import { SITE_NAME, SITE_SHORT_NAME } from '@/lib/site-config';
+
 const translations: Translations = {
   en: {
     // Common
-    "app.name": "S/R/E",
+    "app.name": SITE_NAME,
     "app.tagline": "Start · Restart · Explore",
     "common.save": "Save",
     "common.cancel": "Cancel",
@@ -71,7 +73,7 @@ const translations: Translations = {
     "auth.usernameMinLength": "Username must be at least 3 characters",
     "auth.confirmPasswordPlaceholder": "Re-enter password",
     "auth.accountCreatedSignIn": "Account created! Please sign in.",
-    "auth.welcomeToSRE": "Welcome to S/R/E! Let's set you up.",
+    "auth.welcomeToSRE": `Welcome to ${SITE_NAME}! Let's set you up.`,
     
     // Navigation
     "nav.home": "Home",
@@ -362,7 +364,7 @@ const translations: Translations = {
     "onboarding.goal.gain": "Gain Weight",
     "onboarding.tdeeEstimate": "Estimated Daily Calories",
     "onboarding.tdeeCal": "cal/day",
-    "onboarding.completeSuccess": "Onboarding complete! Welcome to S/R/E!",
+    "onboarding.completeSuccess": `Onboarding complete! Welcome to ${SITE_NAME}!`,
     "onboarding.step": "Step",
     "onboarding.yourPhase": "Your Phase",
     "onboarding.activities": "Activities",
@@ -444,7 +446,7 @@ const translations: Translations = {
   },
   ta: {
     // Common
-    "app.name": "S/R/E",
+    "app.name": SITE_NAME,
     "app.tagline": "தொடங்கு · மீண்டும் தொடங்கு · ஆராயுங்கள்",
     "common.save": "சேமி",
     "common.cancel": "ரத்துசெய்",
@@ -511,7 +513,7 @@ const translations: Translations = {
     "auth.usernameMinLength": "பயனர் பெயர் குறைந்தது 3 எழுத்துகள் இருக்க வேண்டும்",
     "auth.confirmPasswordPlaceholder": "கடவுச்சொல்லை மீண்டும் உள்ளிடு",
     "auth.accountCreatedSignIn": "கணக்கு உருவாக்கப்பட்டது! உள்நுழையவும்.",
-    "auth.welcomeToSRE": "S/R/E க்கு வரவேற்கிறோம்! உங்களை அமைக்க விரும்புகிறோம்.",
+    "auth.welcomeToSRE": `${SITE_NAME} க்கு வரவேற்கிறோம்! உங்களை அமைக்க விரும்புகிறோம்.`,
     
     // Navigation
     "nav.home": "முகப்பு",
@@ -802,7 +804,7 @@ const translations: Translations = {
     "onboarding.goal.gain": "எடை அதிகரி",
     "onboarding.tdeeEstimate": "மதிப்பிடப்பட்ட தினசரி கலோரி",
     "onboarding.tdeeCal": "கலோரி/நாள்",
-    "onboarding.completeSuccess": "ஆன்போர்டிங் முடிந்தது! S/R/E க்கு வரவேற்கிறோம்!",
+    "onboarding.completeSuccess": `ஆன்போர்டிங் முடிந்தது! ${SITE_NAME} க்கு வரவேற்கிறோம்!`,
     "onboarding.step": "படி",
     "onboarding.yourPhase": "உங்கள் கட்டம்",
     "onboarding.activities": "செயல்பாடுகள்",
