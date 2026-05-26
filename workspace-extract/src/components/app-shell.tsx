@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { Logo, LogoSpinner } from '@/components/logo';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useTheme } from 'next-themes';
@@ -195,9 +196,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   if (sessionStatus === 'loading' || (loading && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-          <img src="/logo.png" alt="S/R/E" className="w-8 h-8 rounded-lg" />
-        </motion.div>
+        <LogoSpinner size={56} label="Loading S/R/E..." />
       </div>
     );
   }
@@ -206,9 +205,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   if (sessionStatus === 'unauthenticated') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-          <img src="/logo.png" alt="S/R/E" className="w-8 h-8 rounded-lg" />
-        </motion.div>
+        <LogoSpinner size={56} label="Redirecting..." />
       </div>
     );
   }
@@ -236,8 +233,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       {/* Top Header */}
       <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 glass-glowing">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="S/R/E" className="w-7 h-7 rounded-lg object-cover" />
-          <span className="font-bold text-foreground text-sm">S/R/E</span>
+          <Logo size={28} showText />
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground transition-colors p-2">

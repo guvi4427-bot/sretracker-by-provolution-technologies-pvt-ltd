@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { t } from '@/lib/i18n';
 
@@ -165,8 +166,8 @@ export default function SignupPage() {
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: 'easeOut' }} className="w-full max-w-md px-4">
       <div className="glass-card p-8">
         <div className="flex flex-col items-center mb-8">
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="w-16 h-16 rounded-2xl mb-4 glow-blue overflow-hidden">
-            <img src="/logo.png" alt="S/R/E" className="w-full h-full object-cover" />
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-4">
+            <Logo size={64} />
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">{t('auth.joinSRE')}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('auth.startJourney')}</p>

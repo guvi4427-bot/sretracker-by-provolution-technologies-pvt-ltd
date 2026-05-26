@@ -1,5 +1,6 @@
 import { Zap, Target, Sparkles, Code, Heart, Users, Rocket, Lightbulb, Shield, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 
 export default function AboutPage() {
   return (
@@ -9,7 +10,7 @@ export default function AboutPage() {
       <div className="absolute top-3/4 left-1/2 w-72 h-72 bg-emerald-600/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-12">
         <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.png" alt="S/R/E" className="w-10 h-10 rounded-xl object-cover" />
+          <Logo size={40} />
           <h1 className="text-2xl font-bold text-foreground">About S/R/E</h1>
         </div>
 
@@ -17,7 +18,7 @@ export default function AboutPage() {
         <div className="glass-card p-6 sm:p-8 mb-6">
           <div className="text-center mb-6">
             <div className="w-20 h-20 rounded-2xl mx-auto mb-4 glow-blue overflow-hidden">
-              <img src="/logo.png" alt="S/R/E" className="w-full h-full object-cover" />
+              <Logo size={80} />
             </div>
             <h2 className="text-3xl font-bold text-foreground mb-2">Start / Restart / Explore</h2>
             <p className="text-muted-foreground">Your gamified journey to self-improvement</p>

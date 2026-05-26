@@ -38,7 +38,13 @@ export const metadata: Metadata = {
   authors: [{ name: "Gowtham", url: "https://sretracker.vercel.app" }],
   creator: "Gowtham",
   publisher: "S/R/E",
-  icons: { icon: "/logo.png" },
+  icons: {
+    icon: [
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   metadataBase: new URL("https://sretracker.vercel.app"),
   alternates: {
     canonical: "https://sretracker.vercel.app",
@@ -109,6 +115,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-adsense-account" content="ca-pub-7745236489664493" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="theme-color" content="#0f172a" />
         <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7745236489664493"

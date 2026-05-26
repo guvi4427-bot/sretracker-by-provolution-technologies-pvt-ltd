@@ -89,3 +89,36 @@ Stage Summary:
 - Root cause: pid1's database was missing the `shareLearningProgress` column in the Profile table
 - Fix: Pushed Prisma schema to pid1's database + deployed latest code
 - The Share Learning Progress toggle should now work on pid1
+---
+Task ID: 2
+Agent: main
+Task: Integrate favicon assets as logos and loading animations across the UI
+
+Work Log:
+- Extracted favicon.zip from /home/z/my-project/upload/ — contains: favicon.ico, favicon-96x96.png, favicon.svg, apple-touch-icon.png, web-app-manifest-192x192.png, web-app-manifest-512x512.png, site.webmanifest
+- Copied all favicon files to public/ directory
+- Updated site.webmanifest with SRE Tracker branding and dark theme colors
+- Updated layout.tsx metadata: icons now include favicon-96x96.png + favicon.ico + apple-touch-icon.png; added manifest link, apple-touch-icon link, and theme-color meta tag in <head>
+- Created /src/components/logo.tsx with three reusable components:
+  - Logo: static logo with optional text label, uses Next.js Image + favicon-96x96.png
+  - LogoSpinner: full-screen animated loading state with pulse + rotate animation + glow ring + label text
+  - LogoMiniSpinner: compact inline spinning logo for smaller loading contexts
+- Replaced all /logo.png <img> references across the UI:
+  - app-shell.tsx: loading states now use LogoSpinner; header uses Logo with showText
+  - login/page.tsx: logo uses <Logo size={64} />
+  - signup/page.tsx: logo uses <Logo size={64} />
+  - about/page.tsx: header Logo size={40}, hero Logo size={80}
+  - privacy/page.tsx: header Logo size={40}
+  - terms/page.tsx: header Logo size={40}
+  - contact/page.tsx: header Logo size={40}
+  - community-guidelines/page.tsx: header Logo size={40}
+- Updated middleware.ts: added all new favicon/manifest paths to PUBLIC_PATHS, static file check, and matcher exclusion
+- Updated next.config.ts: added Cache-Control and Content-Type headers for site.webmanifest, favicon-96x96.png, apple-touch-icon.png, and web-app-manifest PNGs
+- Deployed successfully to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
+
+Stage Summary:
+- All favicon assets are now integrated as the official logo across the entire UI
+- Loading animations use the new LogoSpinner with smooth pulse+rotate animation
+- PWA manifest is properly configured with dark theme colors
+- All favicon paths are whitelisted in middleware
+- Both projects deployed and live

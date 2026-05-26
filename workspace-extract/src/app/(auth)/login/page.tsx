@@ -9,6 +9,7 @@ import { Loader2, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { t } from '@/lib/i18n';
 
@@ -81,9 +82,9 @@ export default function LoginPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="w-16 h-16 rounded-2xl mb-4 glow-blue overflow-hidden"
+            className="mb-4"
           >
-            <img src="/logo.png" alt="S/R/E" className="w-full h-full object-cover" />
+            <Logo size={64} />
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">{t('app.name')}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('app.tagline')}</p>

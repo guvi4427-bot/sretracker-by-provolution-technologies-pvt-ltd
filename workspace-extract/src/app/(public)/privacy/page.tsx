@@ -1,5 +1,6 @@
 import { Zap, Shield, Eye, Database, Cookie, Globe, Lock, Users, Mail } from 'lucide-react';
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -8,7 +9,7 @@ export default function PrivacyPolicyPage() {
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-12">
         <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.png" alt="S/R/E" className="w-10 h-10 rounded-xl object-cover" />
+          <Logo size={40} />
           <h1 className="text-2xl font-bold text-foreground">Privacy Policy</h1>
         </div>
 
