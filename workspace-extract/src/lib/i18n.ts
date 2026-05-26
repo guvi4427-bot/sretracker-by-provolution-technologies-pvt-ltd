@@ -35,8 +35,7 @@ const translations: Translations = {
     "auth.phone": "Phone Number",
     "auth.phoneOptional": "Mobile Number (Optional)",
     "auth.phoneAdminOnly": "Visible only to admins",
-    "auth.sendOtp": "Send OTP",
-    "auth.verifyOtp": "Verify OTP",
+
     "auth.invalidCredentials": "Invalid email or password",
     "auth.somethingWentWrong": "Something went wrong",
     "auth.networkError": "Unable to connect",
@@ -51,10 +50,7 @@ const translations: Translations = {
     "auth.enterEmail": "you@example.com",
     "auth.enterPassword": "••••••••",
     "auth.enterPhone": "Enter phone number",
-    "auth.enterOtp": "Enter OTP",
-    "auth.otpSent": "OTP sent successfully!",
-    "auth.otpExpired": "OTP has expired",
-    "auth.invalidOtp": "Invalid OTP",
+
     "auth.accountRestricted": "Account restricted",
     "auth.name": "Full Name",
     "auth.confirmPassword": "Confirm Password",
@@ -66,8 +62,7 @@ const translations: Translations = {
     "auth.fillAllFields": "Please fill in all fields",
     "auth.joinSRE": "Join S / R / E",
     "auth.startJourney": "Start your self-growth journey",
-    "auth.otpResendIn": "Resend in {sec}s",
-    "auth.resendOtp": "Resend OTP",
+
     "auth.namePlaceholder": "John Doe",
     "auth.usernamePlaceholder": "cooluser42",
     "auth.usernameMinLength": "Username must be at least 3 characters",
@@ -475,8 +470,7 @@ const translations: Translations = {
     "auth.phone": "தொலைபேசி எண்",
     "auth.phoneOptional": "கைபேசி எண் (விருப்பம்)",
     "auth.phoneAdminOnly": "நிர்வாகிகளுக்கு மட்டும் காணப்படும்",
-    "auth.sendOtp": "OTP அனுப்பு",
-    "auth.verifyOtp": "OTP சரிபார்",
+
     "auth.invalidCredentials": "தவறான மின்னஞ்சல் அல்லது கடவுச்சொல்",
     "auth.somethingWentWrong": "ஏதோ தவறு நடந்தது",
     "auth.networkError": "இணைக்க முடியவில்லை",
@@ -491,10 +485,7 @@ const translations: Translations = {
     "auth.enterEmail": "you@example.com",
     "auth.enterPassword": "••••••••",
     "auth.enterPhone": "தொலைபேசி எண்ணை உள்ளிடு",
-    "auth.enterOtp": "OTP உள்ளிடு",
-    "auth.otpSent": "OTP வெற்றிகரமாக அனுப்பப்பட்டது!",
-    "auth.otpExpired": "OTP காலாவதியானது",
-    "auth.invalidOtp": "தவறான OTP",
+
     "auth.accountRestricted": "கணக்கு கட்டுப்படுத்தப்பட்டது",
     "auth.name": "முழு பெயர்",
     "auth.confirmPassword": "கடவுச்சொல்லை உறுதிப்படுத்து",
@@ -506,8 +497,7 @@ const translations: Translations = {
     "auth.fillAllFields": "அனைத்து புலங்களையும் நிரப்பு",
     "auth.joinSRE": "S / R / E இல் சேர்",
     "auth.startJourney": "உங்கள் சுய வளர்ச்சி பயணத்தை தொடங்கு",
-    "auth.otpResendIn": "{sec} விநாடிகளில் மீண்டும் அனுப்பு",
-    "auth.resendOtp": "OTP மீண்டும் அனுப்பு",
+
     "auth.namePlaceholder": "உங்கள் பெயர்",
     "auth.usernamePlaceholder": "பயனர்பெயர்42",
     "auth.usernameMinLength": "பயனர் பெயர் குறைந்தது 3 எழுத்துகள் இருக்க வேண்டும்",

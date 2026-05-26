@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { BadgeCheck, Zap, Flame, Star, Trophy, UserPlus, UserMinus, BookOpen, Clock, Flag, AlertTriangle, Loader2, Dumbbell, Video, Share2, FileText, Film, Edit3, ExternalLink, PenTool, Check, Lock } from 'lucide-react';
@@ -101,6 +101,10 @@ export default function PublicProfilePage() {
 
   const isAdmin = myProfile?.isAdmin || myProfile?.isSuperAdmin;
 
+  // Track last follow action type and timestamp to handle reconciliation correctly
+  // 'follow' = count should increase, 'unfollow' = count should decrease
+  const lastActionRef = useRef<{type: 'follow' | 'unfollow' | null; timestamp: number}>({type: null, timestamp: 0});
+
   const loadUser = useCallback(async () => {
     try {
       const r = await fetch(`/api/user/public/${userId}?_t=` + Date.now(), { cache: 'no-store' });
@@ -117,17 +121,33 @@ export default function PublicProfilePage() {
               followingCount: serverFollowing ?? 0,
             };
           }
-          // Merge strategy: only overwrite local count with server data when
-          // server returns a positive value. This prevents DB replication lag
-          // from wiping out optimistic counts (e.g. server returns 0 right
-          // after a follow because the read replica hasn't caught up yet).
+          // Reconciliation logic depends on last action type:
+          // - After follow: server count may lag, so take max(server, local) to protect optimistic +1
+          // - After unfollow: server count should be authoritative (lower), so use server directly
+          // - No recent action: use server count directly (it's the truth)
+          const timeSinceAction = Date.now() - lastActionRef.current.timestamp;
+          const isRecentFollow = lastActionRef.current.type === 'follow' && timeSinceAction < 5000;
+          const isRecentUnfollow = lastActionRef.current.type === 'unfollow' && timeSinceAction < 5000;
+
           const prevFollowers = prev.followersCount ?? 0;
           const prevFollowing = prev.followingCount ?? 0;
+          let safeFollowers: number;
+          let safeFollowing: number;
+
+          if (isRecentFollow) {
+            // After follow: protect optimistic +1 by taking max
+            safeFollowers = (serverFollowers !== undefined && serverFollowers >= prevFollowers) ? serverFollowers : prevFollowers;
+            safeFollowing = (serverFollowing !== undefined && serverFollowing >= prevFollowing) ? serverFollowing : prevFollowing;
+          } else {
+            // After unfollow or no action: server is authoritative
+            safeFollowers = serverFollowers !== undefined ? serverFollowers : prevFollowers;
+            safeFollowing = serverFollowing !== undefined ? serverFollowing : prevFollowing;
+          }
           return {
             ...prev,
             ...data,
-            followersCount: (serverFollowers !== undefined && serverFollowers > 0) ? serverFollowers : prevFollowers,
-            followingCount: (serverFollowing !== undefined && serverFollowing > 0) ? serverFollowing : prevFollowing,
+            followersCount: safeFollowers,
+            followingCount: safeFollowing,
           };
         });
       }
@@ -223,11 +243,13 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        // Optimistically update: target +1 follower, and we'll reconcile with server
+        // Mark action as follow so reconciliation protects the optimistic +1
+        lastActionRef.current = { type: 'follow', timestamp: Date.now() };
+        // Use server count directly if available, otherwise optimistically increment
         setUserData((prev: any) => {
           if (!prev) return prev;
-          const serverCount = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : (prev.followersCount ?? 0) + 1;
-          return { ...prev, followersCount: Math.max(serverCount, (prev.followersCount ?? 0) + 1) };
+          const newCount = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : (prev.followersCount ?? 0) + 1;
+          return { ...prev, followersCount: newCount };
         });
       } else if (data.status === 'pending') {
         setFollowStatus('pending');
@@ -235,11 +257,13 @@ export default function PublicProfilePage() {
       } else if (data.status === 'unfollowed') {
         setFollowStatus('none');
         toast.success('Unfollowed');
-        // Update target user's followers count from server
+        // Mark action as unfollow so reconciliation uses server count (which will be lower)
+        lastActionRef.current = { type: 'unfollow', timestamp: Date.now() };
+        // Use server count directly if available
         setUserData((prev: any) => {
           if (!prev) return prev;
-          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount ?? 0;
-          return { ...prev, followersCount: newFollowers };
+          const newCount = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : Math.max(0, (prev.followersCount ?? 0) - 1);
+          return { ...prev, followersCount: newCount };
         });
       } else if (data.status === 'withdrawn') {
         setFollowStatus('none');
@@ -259,22 +283,21 @@ export default function PublicProfilePage() {
       window.dispatchEvent(new CustomEvent('follow-updated'));
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
-      // Delayed server refresh for count reconciliation — only update counts if server returns > 0
-      // This prevents DB replication lag from overwriting optimistic counts with stale zeros
+      // Delayed server refresh for count reconciliation
       setTimeout(async () => {
         try {
           const r = await fetch(`/api/user/public/${userId}?_t=` + Date.now(), { cache: 'no-store' });
           if (r.ok) {
-            const data = await r.json();
-            const sFollowers = typeof data.followersCount === 'number' ? data.followersCount : undefined;
-            const sFollowing = typeof data.followingCount === 'number' ? data.followingCount : undefined;
-            // Only update if server returns actual non-negative counts (skip 0 from replication lag)
+            const serverData = await r.json();
+            const sFollowers = typeof serverData.followersCount === 'number' ? serverData.followersCount : undefined;
+            const sFollowing = typeof serverData.followingCount === 'number' ? serverData.followingCount : undefined;
             setUserData((prev: any) => {
               if (!prev) return prev;
+              // After delay, server should have caught up — use server count directly
               return {
                 ...prev,
-                followersCount: sFollowers !== undefined && sFollowers > 0 ? sFollowers : prev.followersCount,
-                followingCount: sFollowing !== undefined && sFollowing > 0 ? sFollowing : prev.followingCount,
+                followersCount: sFollowers !== undefined ? sFollowers : prev.followersCount,
+                followingCount: sFollowing !== undefined ? sFollowing : prev.followingCount,
               };
             });
           }
@@ -366,6 +389,11 @@ export default function PublicProfilePage() {
               <h2 className="text-xl font-bold text-foreground">{p.name || 'User'}</h2>
               {p.verified && <BadgeCheck size={18} className="text-blue-400 shrink-0" />}
               {p.isPublic === false && <Lock size={14} className="text-amber-400 shrink-0" />}
+              {!isOwn && (
+                <Button onClick={() => setReportOpen(true)} size="sm" variant="ghost" className="text-muted-foreground hover:text-amber-400 ml-auto">
+                  <Flag size={14} />
+                </Button>
+              )}
             </div>
             <p className="text-sm text-muted-foreground">@{p.username || userData.username || ''}</p>
             <p className="text-sm text-muted-foreground mt-1">{p.bio || ''}</p>
@@ -378,21 +406,18 @@ export default function PublicProfilePage() {
               <span className="text-xs text-muted-foreground tabular-nums">{p.xp || 0} XP</span>
               <StreakBadge streak={p.currentStreak || 0} size="sm" />
             </div>
-            <div className="flex items-center gap-4 mt-3">
-              <button onClick={openFollowers} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <span className="text-foreground font-medium">{userData.followersCount ?? 0}</span> {t('profile.followers')}
-              </button>
-              <button onClick={openFollowers} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <span className="text-foreground font-medium">{userData.followingCount ?? 0}</span> {t('profile.following')}
-              </button>
+            <div className="flex items-center justify-between gap-3 mt-3">
+              <div className="flex items-center gap-4 shrink-0">
+                <button onClick={openFollowers} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <span className="text-foreground font-medium">{userData.followersCount ?? 0}</span> {t('profile.followers')}
+                </button>
+                <button onClick={openFollowers} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <span className="text-foreground font-medium">{userData.followingCount ?? 0}</span> {t('profile.following')}
+                </button>
+              </div>
               {!isOwn && (
-                <Button onClick={handleFollow} size="sm" variant={followStatus === 'accepted' ? 'outline' : 'default'} className={followStatus !== 'accepted' ? 'gradient-blue text-white' : ''}>
+                <Button onClick={handleFollow} size="sm" variant={followStatus === 'accepted' ? 'outline' : 'default'} className={`min-w-[100px] shrink-0 ${followStatus !== 'accepted' ? 'gradient-blue text-white' : ''}`}>
                   {followStatus === 'accepted' ? <><UserMinus size={14} className="mr-1" />Unfollow</> : followStatus === 'pending' ? <><Clock size={14} className="mr-1" />Pending</> : <><UserPlus size={14} className="mr-1" />{p.isPublic !== false ? t('profile.follow') : t('profile.request')}</>}
-                </Button>
-              )}
-              {!isOwn && (
-                <Button onClick={() => setReportOpen(true)} size="sm" variant="ghost" className="text-muted-foreground hover:text-amber-400">
-                  <Flag size={14} className="mr-1" />Report
                 </Button>
               )}
             </div>

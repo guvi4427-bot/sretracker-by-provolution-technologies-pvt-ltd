@@ -72,7 +72,11 @@ export default function FriendsPage() {
                 <p className="text-[10px] text-muted-foreground">@{friend.username || 'user'}</p>
               </div>
               <Button
-                onClick={() => router.push(`/messages?userId=${friend.id}`)}
+                onClick={() => {
+                  // Use window.location.href for reliable navigation to DM with userId
+                  // router.push can sometimes lose query params with Suspense boundaries
+                  window.location.href = `/messages?userId=${friend.id}`;
+                }}
                 size="sm"
                 variant="ghost"
                 className="text-blue-400 hover:bg-blue-600/10 shrink-0"

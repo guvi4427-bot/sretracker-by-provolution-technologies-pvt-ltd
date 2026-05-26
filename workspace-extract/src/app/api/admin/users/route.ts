@@ -92,15 +92,18 @@ export async function PATCH(request: Request) {
     const isSuperAdmin = adminCheck.data.isSuperAdmin;
     const isTargetSuperAdmin = user.adminRole?.isSuperAdmin || user.email === SUPER_ADMIN_EMAIL;
 
-    // Admins can perform all actions EXCEPT on super admins:
-    // Only super admin can modify other super admins (ban, suspend, delete, verify, change access)
+    // Admins can perform ban/suspend/activate/verify/unverify on ALL users including super admins
+    // Only restriction: admins cannot delete super admins or modify super admin access (promote/demote)
     if (isTargetSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Only super admin can modify or delete a super admin' }, { status: 403 });
-    }
-
-    // Super admin exclusive actions: promoting to super admin and demoting super admin
-    if (['promote_super_admin', 'demote_super_admin'].includes(action) && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Only super admin can modify super admin access' }, { status: 403 });
+      // Non-super-admin cannot delete a super admin
+      if (action === 'delete') {
+        return NextResponse.json({ error: 'Only super admin can delete a super admin' }, { status: 403 });
+      }
+      // Non-super-admin cannot modify access of a super admin (promote/demote)
+      if (['promote_super_admin', 'demote_super_admin', 'promote_admin', 'demote_admin'].includes(action)) {
+        return NextResponse.json({ error: 'Only super admin can modify super admin access' }, { status: 403 });
+      }
+      // All other actions (ban, suspend, activate, verify, unverify) are allowed for admins on super admins
     }
 
     const validActions = ['suspend', 'ban', 'activate', 'verify', 'unverify', 'promote_admin', 'promote_super_admin', 'demote_admin', 'demote_super_admin'];
@@ -179,8 +182,8 @@ export async function DELETE(request: Request) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const isTargetSuperAdmin = user.adminRole?.isSuperAdmin || user.email === SUPER_ADMIN_EMAIL;
-    if (isTargetSuperAdmin) {
-      return NextResponse.json({ error: 'Cannot delete a super admin' }, { status: 403 });
+    if (isTargetSuperAdmin && !adminCheck.data.isSuperAdmin) {
+      return NextResponse.json({ error: 'Only super admin can delete a super admin' }, { status: 403 });
     }
 
     await logAudit(adminCheck.data.session.user.id, 'user_deleted', userId, { targetEmail: user.email });

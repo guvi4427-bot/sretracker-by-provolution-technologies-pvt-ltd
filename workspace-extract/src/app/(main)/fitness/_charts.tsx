@@ -9,6 +9,7 @@ interface CalorieData {
   date: string;
   consumed: number;
   burned: number;
+  balance?: number;
 }
 
 interface MacroData {
@@ -37,6 +38,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function CalorieChart({ data }: { data: CalorieData[] }) {
+  const hasBalance = data.some(d => d.balance !== undefined);
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
@@ -47,6 +49,7 @@ export function CalorieChart({ data }: { data: CalorieData[] }) {
           <Tooltip content={<CustomTooltip />} />
           <Line type="monotone" dataKey="consumed" name="Consumed" stroke="#F59E0B" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="burned" name="Burned" stroke="#EF4444" strokeWidth={2} dot={false} />
+          {hasBalance && <Line type="monotone" dataKey="balance" name="Balance" stroke="#10B981" strokeWidth={2} dot={false} strokeDasharray="5 5" />}
         </LineChart>
       </ResponsiveContainer>
     </div>

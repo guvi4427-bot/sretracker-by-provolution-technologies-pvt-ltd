@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { MessageCircle, Users, Plus, Send, Settings, Shield, LogOut, Crown, Search, Loader2, ArrowLeft, X, BookOpen, Globe, Sparkles, ChevronRight } from 'lucide-react';
@@ -83,6 +83,14 @@ function renderMessageContent(content: string, router: ReturnType<typeof useRout
 }
 
 export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div>}>
+      <MessagesPageInner />
+    </Suspense>
+  );
+}
+
+function MessagesPageInner() {
   const { profile } = useUserStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -165,8 +173,9 @@ export default function MessagesPage() {
   const dmInitRef = useRef<string|null>(null); // Track which userId we've already init'd
   useEffect(() => {
     const targetUserId = searchParams.get('userId');
-    if (!targetUserId || !profile?.userId) return;
+    if (!targetUserId) return;
     if (dmInitRef.current === targetUserId) return; // Already init'd this user
+    if (!profile?.userId) return; // Wait for profile to load
     dmInitRef.current = targetUserId;
     // Fetch target user's profile FIRST to ensure we have the name
     (async () => {
@@ -220,7 +229,8 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!activeConv || !activeConvOtherUser) return;
     const conv = conversations.find((c: any) => c.id === activeConv);
-    if (conv?.otherUser?.name && (!activeConvOtherUser.name || activeConvOtherUser.name === 'User')) {
+    // Only update if conversations list has a better name than what we currently have
+    if (conv?.otherUser?.name && conv.otherUser.name !== 'User' && (!activeConvOtherUser.name || activeConvOtherUser.name === 'User')) {
       setActiveConvOtherUser((prev: any) => prev ? { ...prev, name: conv.otherUser.name, username: conv.otherUser.username || prev.username } : prev);
     }
   }, [conversations, activeConv, activeConvOtherUser]);
@@ -255,17 +265,30 @@ export default function MessagesPage() {
     setActiveConv(convId);
     setActiveGroup(null);
     setMobileShowChat(true);
-    // Always use the latest user info; prefer the fetched otherUser, fallback to conversations list
-    if (otherUser && otherUser.name && otherUser.name !== 'User') {
-      setActiveConvOtherUser(otherUser);
-    } else {
-      // Try to get from conversations list
-      const conv = conversations.find((c: any) => c.id === convId);
-      if (conv?.otherUser) {
-        setActiveConvOtherUser(conv.otherUser);
-      } else if (otherUser) {
-        setActiveConvOtherUser(otherUser);
-      }
+    // Set otherUser immediately with whatever we have
+    const initialUser = otherUser || conversations.find((c: any) => c.id === convId)?.otherUser;
+    if (initialUser) {
+      setActiveConvOtherUser(initialUser);
+    }
+    // Always fetch real name from API to avoid showing "User" placeholder
+    const otherUserId = initialUser?.id || otherUser?.id;
+    if (otherUserId) {
+      try {
+        const userRes = await fetch(`/api/user/public/${otherUserId}`);
+        if (userRes.ok) {
+          const ud = await userRes.json();
+          const realName = ud.profile?.name || ud.username || 'User';
+          const realUsername = ud.username || '';
+          // Only update if we got a better name than what we had
+          if (realName !== 'User' || !initialUser?.name) {
+            setActiveConvOtherUser(prev => {
+              // Don't overwrite if we already have a good name
+              if (prev && prev.name && prev.name !== 'User') return prev;
+              return { id: otherUserId, name: realName, username: realUsername };
+            });
+          }
+        }
+      } catch {}
     }
     try {
       const r = await fetch(`/api/messages/${convId}`);

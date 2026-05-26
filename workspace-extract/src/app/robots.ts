@@ -23,6 +23,22 @@ export default function robots(): MetadataRoute.Robots {
         crawlDelay: 2,
       },
       {
+        userAgent: "GPTBot",
+        allow: "/",
+      },
+      {
+        userAgent: "ClaudeBot",
+        allow: "/",
+      },
+      {
+        userAgent: "anthropic-ai",
+        allow: "/",
+      },
+      {
+        userAgent: "PerplexityBot",
+        allow: "/",
+      },
+      {
         userAgent: "Twitterbot",
         allow: "/",
       },

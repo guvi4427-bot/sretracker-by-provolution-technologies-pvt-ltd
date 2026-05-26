@@ -288,42 +288,38 @@ export default function AdminUsers() {
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/profile/${user.id}`); }}>
                               <User size={14} className="mr-2" /> View Profile
                             </DropdownMenuItem>
+                            {/* Admin can ban/suspend/verify/activate ALL users including super admins */}
+                            {/* Only restriction: cannot modify access of or delete super admins */}
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'verify' }); }}>
+                              <ShieldCheck size={14} className="mr-2" /> Verify
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'suspend' }); }}>
+                              <UserX size={14} className="mr-2" /> Suspend
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'ban' }); }} className="text-red-500">
+                              <ShieldBan size={14} className="mr-2" /> Ban
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'activate' }); }}>
+                              <Eye size={14} className="mr-2" /> Activate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'unverify' }); }}>
+                              <XCircle size={14} className="mr-2" /> Unverify
+                            </DropdownMenuItem>
+                            {/* Only super admin can delete super admins; admins can delete non-super-admin users */}
                             {!(user.adminRole?.isSuperAdmin) && (
-                              <>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'verify' }); }}>
-                                  <ShieldCheck size={14} className="mr-2" /> Verify
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'suspend' }); }}>
-                                  <UserX size={14} className="mr-2" /> Suspend
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'ban' }); }} className="text-red-500">
-                                  <ShieldBan size={14} className="mr-2" /> Ban
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'activate' }); }}>
-                                  <Eye size={14} className="mr-2" /> Activate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'unverify' }); }}>
-                                  <XCircle size={14} className="mr-2" /> Unverify
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'delete' }); }} className="text-red-600">
-                                  <Trash2 size={14} className="mr-2" /> Delete User
-                                </DropdownMenuItem>
-                              </>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'delete' }); }} className="text-red-600">
+                                <Trash2 size={14} className="mr-2" /> Delete User
+                              </DropdownMenuItem>
                             )}
                             {user.adminRole?.isSuperAdmin && !isSuperAdmin && (
                               <DropdownMenuItem disabled className="text-muted-foreground/50">
-                                <Lock size={14} className="mr-2" /> Super Admin — No Access
+                                <Lock size={14} className="mr-2" /> Cannot Delete/Modify Super Admin
                               </DropdownMenuItem>
                             )}
                             {user.adminRole?.isSuperAdmin && isSuperAdmin && (
-                              <>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'verify' }); }}>
-                                  <ShieldCheck size={14} className="mr-2" /> Verify
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'unverify' }); }}>
-                                  <XCircle size={14} className="mr-2" /> Unverify
-                                </DropdownMenuItem>
-                              </>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, user, action: 'delete' }); }} className="text-red-600">
+                                <Trash2 size={14} className="mr-2" /> Delete Super Admin
+                              </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>

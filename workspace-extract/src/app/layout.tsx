@@ -52,11 +52,21 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: SITE_NAME,
     locale: "en_US",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: `${SITE_SHORT_NAME} — Self-Growth Progression Platform`,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE_NAME} — Gamified Self-Growth Platform`,
     description: `Track your fitness, learning, and content creation habits with XP, achievements, and a supportive community on ${SITE_NAME}.`,
+    images: ["/og-image.png"],
+    creator: "@sreplatform",
   },
   robots: {
     index: true,
@@ -77,31 +87,61 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const jsonLd = {
+  // JSON-LD structured data schemas
+  const websiteSchema = {
     "@context": "https://schema.org",
-    "@type": "WebApplication",
-    name: `${SITE_NAME} — Gamified Self-Growth Platform`,
-    description: SITE_DESCRIPTION,
+    "@type": "WebSite",
+    name: SITE_NAME,
+    alternateName: "Start Restart Explore",
     url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/discover?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.png`,
+    sameAs: [],
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer support",
+      url: `${SITE_URL}/contact`,
+    },
+  };
+
+  const softwareSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: SITE_NAME,
     applicationCategory: "LifestyleApplication",
     operatingSystem: "Web",
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
     offers: {
       "@type": "Offer",
       price: "0",
       priceCurrency: "USD",
     },
-    author: {
-      "@type": "Person",
-      name: SITE_CREATOR,
-    },
     featureList: [
-      "Fitness tracking with calorie counting and workout logs",
-      "Learning progression with topics and entry logs",
-      "Content creation tracking with series and publishing",
+      "Learning progression tracking",
+      "Fitness journey logging",
+      "Content creator growth tracking",
+      "Public progression feed",
+      "AI-assisted learning",
+      "Topic discovery",
+      "Accountability community",
       "Gamification with XP, levels, streaks, and achievements",
       "Consistency systems with daily quests and reminders",
-      "Progression-focused social community with feed and discover",
-      "AI-powered chatbot assistant for guidance",
     ],
   };
 
@@ -119,7 +159,6 @@ export default function RootLayout({
         <meta name="theme-color" content="#0f172a" />
         <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
         <meta name="application-name" content={SITE_NAME} />
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7745236489664493"
@@ -127,7 +166,15 @@ export default function RootLayout({
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
         />
       </head>
       <body

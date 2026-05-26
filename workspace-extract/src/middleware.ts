@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
   "/manifest.webmanifest", "/site.webmanifest", "/public",
   "/logo.svg", "/logo.png", "/ads.txt", "/app-ads.txt", "/robots.txt", "/sitemap.xml",
+  "/llms.txt", "/og-image.png",
   "/google990ef60d3a371354.html",
 ];
 

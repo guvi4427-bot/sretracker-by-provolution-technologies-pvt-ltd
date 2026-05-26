@@ -6,7 +6,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     {
-      url: `${SITE_URL}/home`,
+      url: `${SITE_URL}/`,
       lastModified: now,
       changeFrequency: "daily",
       priority: 1.0,
@@ -14,13 +14,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${SITE_URL}/feed`,
       lastModified: now,
-      changeFrequency: "daily",
+      changeFrequency: "hourly",
       priority: 0.9,
     },
     {
       url: `${SITE_URL}/discover`,
       lastModified: now,
-      changeFrequency: "daily",
+      changeFrequency: "hourly",
       priority: 0.9,
     },
     {
@@ -36,22 +36,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
-      url: `${SITE_URL}/terms`,
+      url: `${SITE_URL}/privacy`,
       lastModified: now,
-      changeFrequency: "monthly",
+      changeFrequency: "yearly",
       priority: 0.6,
     },
     {
-      url: `${SITE_URL}/privacy`,
+      url: `${SITE_URL}/terms`,
       lastModified: now,
-      changeFrequency: "monthly",
+      changeFrequency: "yearly",
       priority: 0.6,
     },
     {
       url: `${SITE_URL}/community-guidelines`,
       lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.5,
+      changeFrequency: "yearly",
+      priority: 0.6,
     },
   ];
 }

@@ -64,8 +64,9 @@ export default function ProfilePage() {
   const [showFollowers, setShowFollowers] = useState(true);
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
+  // Initialize from user store to prevent flash of 0 on mount
+  const [followerCount, setFollowerCount] = useState(() => profile?.followerCount || 0);
+  const [followingCount, setFollowingCount] = useState(() => profile?.followingCount || 0);
   const [learningTopics, setLearningTopics] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [myReposts, setMyReposts] = useState<any[]>([]);
@@ -107,15 +108,22 @@ export default function ProfilePage() {
 
   const fetchCounts = useCallback(async () => {
     try {
+      // First sync from user store (which has merge protection)
+      const storeCounts = useUserStore.getState().profile;
+      if (storeCounts) {
+        // On initial load, use store counts; don't use Math.max to avoid
+        // preventing legitimate decreases (e.g. after unfollow)
+        setFollowerCount(storeCounts.followerCount || 0);
+        setFollowingCount(storeCounts.followingCount || 0);
+      }
       const r = await fetch('/api/follow?type=count&_t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) {
         const d = await r.json();
-        // Only update if server returns valid numbers; never overwrite with 0
-        // if we already have a positive count (DB replication lag protection)
         const serverFollowers = typeof d.followersCount === 'number' ? d.followersCount : undefined;
         const serverFollowing = typeof d.followingCount === 'number' ? d.followingCount : undefined;
-        setFollowerCount(prev => serverFollowers !== undefined ? Math.max(serverFollowers, prev) : prev);
-        setFollowingCount(prev => serverFollowing !== undefined ? Math.max(serverFollowing, prev) : prev);
+        // Server count is authoritative — use it directly
+        if (serverFollowers !== undefined) setFollowerCount(serverFollowers);
+        if (serverFollowing !== undefined) setFollowingCount(serverFollowing);
       }
     } catch {}
   }, []);
@@ -147,6 +155,15 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => { fetchCounts(); fetchAchievements(); fetchLearningTopics(); fetchMyPosts(); }, [fetchCounts, fetchAchievements, fetchLearningTopics, fetchMyPosts]);
+
+  // Sync follower/following counts from user store whenever profile updates
+  // (AppShell fetchProfile runs every 5s and has merge protection)
+  useEffect(() => {
+    if (profile) {
+      setFollowerCount(profile.followerCount || 0);
+      setFollowingCount(profile.followingCount || 0);
+    }
+  }, [profile?.followerCount, profile?.followingCount]);
 
   // Refresh follower/following counts when page gains focus (e.g., after following someone elsewhere)
   // Also listen for visibility change to refresh on route navigation back

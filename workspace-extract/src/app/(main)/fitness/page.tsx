@@ -105,7 +105,8 @@ export default function FitnessPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileReady, setProfileReady] = useState(false); // Prevents form flash before first load
-  const [initialFetchDone, setInitialFetchDone] = useState(false); // Extra guard against flash
+  const [initialLoadDone, setInitialLoadDone] = useState(false); // True only after first fetchProfile resolves
+  const [dataLoaded, setDataLoaded] = useState(false); // True after ALL initial data is fetched
 
   // Unit conversion helpers
   const isImperial = profileForm.unitSystem === 'imperial';
@@ -162,6 +163,7 @@ export default function FitnessPage() {
     } catch {} finally {
       setProfileLoading(false);
       setProfileReady(true);
+      setInitialLoadDone(true);
     }
   }, []);
 
@@ -212,40 +214,39 @@ export default function FitnessPage() {
 
   useEffect(() => {
     // Fetch primary data first (profile, today's food/workouts/weights)
-    fetchProfile(); fetchFoodLogs(); fetchWorkouts(); fetchWeights();
-    // Load past 7 days of nutrition + workout history in background (deferred)
+    async function loadInitialData() {
+      await Promise.all([fetchProfile(), fetchFoodLogs(), fetchWorkouts(), fetchWeights()]);
+      setDataLoaded(true);
+    }
+    loadInitialData();
+    // Load past 3 days of nutrition + workout history in background (deferred)
+    // Reduced from 7 to 3 days for faster load; fetch in parallel for speed
     const timer = setTimeout(() => {
-      const last7 = Array.from({ length: 7 }, (_, i) => {
+      const last3 = Array.from({ length: 3 }, (_, i) => {
         const d = new Date(); d.setDate(d.getDate() - (i + 1));
         return d.toISOString().split('T')[0];
       });
-      Promise.all(last7.map(async dateStr => {
+      // Fetch all 3 days in parallel to avoid sequential blocking
+      Promise.all(last3.map(async (dateStr) => {
         try {
           const [foodRes, workoutRes] = await Promise.all([
             fetch(`/api/fitness/food?date=${dateStr}`),
             fetch(`/api/fitness/workout?date=${dateStr}`),
           ]);
-          let fLogs: any[] = [];
-          let wLogs: any[] = [];
-          if (foodRes.ok) { const d = await foodRes.json(); fLogs = Array.isArray(d) ? d : d.foodLogs || []; }
-          if (workoutRes.ok) { const d = await workoutRes.json(); wLogs = Array.isArray(d) ? d : d.workouts || []; }
-          return { dateStr, foodLogs: fLogs, workoutLogs: wLogs };
+          if (foodRes.ok) {
+            const d = await foodRes.json();
+            const fLogs = Array.isArray(d) ? d : d.foodLogs || [];
+            setNutritionHistory(prev => ({ ...prev, [dateStr]: fLogs }));
+          }
+          if (workoutRes.ok) {
+            const d = await workoutRes.json();
+            const wLogs = Array.isArray(d) ? d : d.workouts || [];
+            setWorkoutHistory(prev => ({ ...prev, [dateStr]: wLogs }));
+          }
         } catch {}
-        return { dateStr, foodLogs: [] as any[], workoutLogs: [] as any[] };
-      })).then(results => {
-        const foodMap: Record<string, any[]> = {};
-        const workoutMap: Record<string, any[]> = {};
-        results.forEach(r => {
-          foodMap[r.dateStr] = r.foodLogs;
-          workoutMap[r.dateStr] = r.workoutLogs;
-        });
-        setNutritionHistory(prev => ({ ...prev, ...foodMap }));
-        setWorkoutHistory(prev => ({ ...prev, ...workoutMap }));
-        // Mark initial fetch as complete — prevents form flash
-        setInitialFetchDone(true);
-      });
-    }, 100); // Small delay to let primary data render first
-    return () => { clearTimeout(timer); setInitialFetchDone(true); };
+      }));
+    }, 300); // Reduced delay to let primary data render first
+    return () => { clearTimeout(timer); };
   }, [fetchProfile, fetchFoodLogs, fetchWorkouts, fetchWeights]);
 
   const totalMacros = foodLogs.reduce((acc: any, f: any) => ({
@@ -291,9 +292,13 @@ export default function FitnessPage() {
   const computedMacros = computedRequiredCal > 0 ? calcMacros(computedRequiredCal, metricWeight) : null;
 
   // Get current targets from fitness profile or computed
-  const currentTDEE = fitnessProfile?.tdee || computedTDEE || 0;
-  const currentRequiredCal = fitnessProfile?.calorieTarget || computedRequiredCal || 0;
-  const currentMacros = currentRequiredCal > 0 ? calcMacros(currentRequiredCal, fitnessProfile?.weight || metricWeight || 70) : null;
+  // Prefer computed values (from profileForm) when they're available, as they reflect
+  // the latest weight input (e.g., after addWeight). Fall back to fitnessProfile for initial load.
+  const currentTDEE = computedTDEE > 0 ? computedTDEE : (fitnessProfile?.tdee || 0);
+  const currentRequiredCal = computedRequiredCal > 0 ? computedRequiredCal : (fitnessProfile?.calorieTarget || 0);
+  // Use latest weight from profileForm (just updated by addWeight) or fitnessProfile
+  const currentWeight = metricWeight > 0 ? metricWeight : (fitnessProfile?.weight || 70);
+  const currentMacros = currentRequiredCal > 0 ? calcMacros(currentRequiredCal, currentWeight) : null;
 
   async function saveFitnessProfile() {
     setProfileSaving(true);
@@ -499,6 +504,20 @@ export default function FitnessPage() {
     .map(([date, calories]) => ({ date, calories }))
     .slice(-14);
 
+  // Show loading screen until all initial data is fetched
+  if (!dataLoaded) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading fitness data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -517,7 +536,7 @@ export default function FitnessPage() {
               )}
             </div>
 
-            {!profileReady || !initialFetchDone ? (
+            {(!profileReady || !initialLoadDone) ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
               </div>
@@ -1320,6 +1339,8 @@ export default function FitnessPage() {
 
           {/* Calorie Balance Chart */}
           {(() => {
+            // Only show if user has a fitness profile with calorie targets
+            if (!fitnessProfile && !currentRequiredCal) return null;
             // Deduplicate workouts by ID to prevent double-counting
             const allWorkoutsDeduped = Array.from(
               new Map([...workouts, ...Object.values(workoutHistory).flat()].map((w: any) => [w.id, w])).values()
@@ -1328,26 +1349,40 @@ export default function FitnessPage() {
               const logs = dateStr === today ? foodLogs : (nutritionHistory[dateStr] || []);
               const dayWorkouts = allWorkoutsDeduped.filter((w: any) => {
                 if (!w.date) return false;
-                // Normalize both dates to YYYY-MM-DD for comparison
                 const wDate = typeof w.date === 'string' ? w.date.split('T')[0] : new Date(w.date).toISOString().split('T')[0];
                 return wDate === dateStr;
               });
               const consumed = logs.reduce((a: number, f: any) => a + (f.calories || 0), 0);
               const burned = dayWorkouts.reduce((a: number, w: any) => a + (w.estimatedCalories || 0), 0);
-              return { date: dateStr.slice(5), consumed, burned };
+              const balance = (currentRequiredCal || 0) - consumed + burned;
+              return { date: dateStr.slice(5), consumed, burned, balance };
             });
             const hasAnyData = calorieChartData.some(d => d.consumed > 0 || d.burned > 0);
-            // Also check if we have any nutrition or workout data at all (history may not be loaded yet)
-            const hasFoodData = foodLogs.length > 0 || Object.keys(nutritionHistory).some(k => (nutritionHistory[k] || []).length > 0);
-            const hasWorkoutData = allWorkoutsDeduped.length > 0;
-            if (!hasAnyData && !hasFoodData && !hasWorkoutData) {
+            const todayData = calorieChartData.find(d => d.date === today.slice(5));
+            const todayBalance = todayData ? todayData.balance : (currentRequiredCal || 0);
+            if (!hasAnyData) {
               return (
                 <GlassCard variant="glowing" className="p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Flame size={16} className="text-amber-400" />
                     <h3 className="text-sm font-medium text-muted-foreground">Calorie Balance (7 Days)</h3>
                   </div>
-                  <p className="text-xs text-muted-foreground/50 text-center py-6">Log food or workouts to see your calorie balance trend</p>
+                  {/* Today's Balance Summary */}
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="text-center p-2 rounded-lg bg-accent/30">
+                      <p className="text-xs text-muted-foreground/70">Required</p>
+                      <p className="text-sm font-bold text-blue-400">{currentRequiredCal || 0}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-accent/30">
+                      <p className="text-xs text-muted-foreground/70">Consumed</p>
+                      <p className="text-sm font-bold text-amber-400">{todayData?.consumed || 0}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-accent/30">
+                      <p className="text-xs text-muted-foreground/70">Remaining</p>
+                      <p className={`text-sm font-bold ${todayBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{todayBalance}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground/50 text-center py-2">Log food or workouts to see your calorie balance trend</p>
                 </GlassCard>
               );
             }
@@ -1356,6 +1391,21 @@ export default function FitnessPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <Flame size={16} className="text-amber-400" />
                   <h3 className="text-sm font-medium text-muted-foreground">Calorie Balance (7 Days)</h3>
+                </div>
+                {/* Today's Balance Summary */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center p-2 rounded-lg bg-accent/30">
+                    <p className="text-xs text-muted-foreground/70">Required</p>
+                    <p className="text-sm font-bold text-blue-400">{currentRequiredCal || 0}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-accent/30">
+                    <p className="text-xs text-muted-foreground/70">Consumed</p>
+                    <p className="text-sm font-bold text-amber-400">{todayData?.consumed || 0}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-accent/30">
+                    <p className="text-xs text-muted-foreground/70">Remaining</p>
+                    <p className={`text-sm font-bold ${todayBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{todayBalance}</p>
+                  </div>
                 </div>
                 <CalorieChart data={calorieChartData} />
               </GlassCard>
