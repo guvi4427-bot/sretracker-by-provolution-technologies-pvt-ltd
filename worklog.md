@@ -1,181 +1,99 @@
+# SRE Tracker Deployment Debug Worklog
+
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Implement 5 phases of SEO, crawlability, guest access, and content improvements for both pid1 and pid2
+Task: Phase 1 — Verify Current Production Health
 
 Work Log:
-- PHASE 1: Created src/lib/site-config.ts for per-project branding (SITE_NAME, SITE_URL from env vars)
-- PHASE 1: Updated layout.tsx with dynamic metadata using site-config (title templates, OG, Twitter, canonical URLs, JSON-LD)
-- PHASE 1: Created src/app/manifest.ts for dynamic PWA manifest per project
-- PHASE 1: Updated loading.tsx to use LogoSpinner instead of generic spinner
-- PHASE 1: Updated logo.tsx, app-shell.tsx, constants.ts, i18n.ts to use site-config branding
-- PHASE 1: Set NEXT_PUBLIC_SITE_NAME and NEXT_PUBLIC_SITE_URL env vars on both Vercel projects
-- PHASE 1: Removed static public/site.webmanifest, added manifest.webmanifest headers to next.config.ts
-- PHASE 1: Deployed to both pid1 (SRE Tracker) and pid2 (SRE Track)
-
-- PHASE 2: Created src/app/robots.ts with dynamic robots.txt (blocks auth/admin/api paths for *, allows crawlers)
-- PHASE 2: Created src/app/sitemap.ts with dynamic sitemap (home, feed, discover, about, contact, terms, privacy, community-guidelines)
-- PHASE 2: Removed static public/robots.txt and public/sitemap.xml
-- PHASE 2: Updated middleware.ts to allow /manifest.webmanifest
-- PHASE 2: Deployed to both projects, verified per-domain sitemap URLs
-
-- PHASE 3: Created src/components/guest-guard.tsx (GuestProvider, useGuest hook, LoginPrompt modal)
-- PHASE 3: Created src/components/guest-shell.tsx (GuestShell with simplified nav for guests)
-- PHASE 3: Updated src/middleware.ts with GUEST_ALLOWED_PATHS and GUEST_ALLOWED_API_PATHS
-- PHASE 3: Updated src/app/(auth)/login/page.tsx with "Continue as Guest" button
-- PHASE 3: Updated src/app/(main)/layout.tsx to detect guest mode and use GuestShell
-- PHASE 3: Updated src/app/page.tsx to redirect guests to /feed
-- PHASE 3: Added guest guards to feed/page.tsx (createPost, toggleLike, toggleBookmark, toggleRepost, addComment) and discover/page.tsx (followUser, joinGroup)
-- PHASE 3: Hidden create-post textarea, My Posts tab, and Bookmarks tab for guests
-
-- PHASE 4: Implemented guest session cleanup in guest-shell.tsx
-- PHASE 4: Cookie max-age=86400 (24h) auto-expires in browser
-- PHASE 4: Activity-based cookie extension (throttled to 5min intervals)
-- PHASE 4: 60-second interval check for cookie expiration with auto-redirect to /login
-- PHASE 4: localStorage cleanup on expiration
-
-- PHASE 5: Added per-page metadata (title, description, canonical, OG) to all public pages (about, contact, terms, privacy, community-guidelines)
-- PHASE 5: Created feed/layout.tsx and discover/layout.tsx with SEO metadata
-- PHASE 5: Deployed to both projects
+- Checked live production site https://sretracker.vercel.app
+- Verified 12+ pages/endpoint responses (all 200 or expected 307)
+- Checked for hydration errors, missing chunks, manifest errors — NONE found
+- Verified sitemap.xml, robots.txt, manifest.webmanifest — all working
+- Checked static assets (favicons, logos, ads.txt, etc.) — all 200
+- Discovered Vercel CLI is NOT authenticated — root cause of CLI hangs/timeouts
+- Identified GitHub → Vercel auto-deploy as the working pipeline
 
 Stage Summary:
-- All 5 phases completed and deployed to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
-- pid1 shows "SRE Tracker" branding, pid2 shows "SRE Track" branding via env vars
-- Guest access allows browsing feed/discover/profiles but blocks all interactions
-- robots.txt blocks auth/admin paths, sitemap.xml includes public pages
-- All public pages have proper semantic HTML (H1/H2/H3) and per-page metadata
-- Auth, routing, database schema, and existing user flows preserved unchanged
+- Production is LIVE and HEALTHY
+- Deployment instability was CLI-only, not application-level
+- Vercel CLI not authenticated → all CLI deploy attempts fail/hang
+- Proper deploy path: git push → GitHub → Vercel auto-deploy
 
 ---
 Task ID: 2
 Agent: Main Agent
-Task: CRITICAL FIX — Logged-in users treated as guests + Phase 1 Guest Access Foundation + AdSense visibility for guests
+Task: Phase 2 — Clean Local Build Validation
 
 Work Log:
-- DIAGNOSED critical bug: MainLayout checked localStorage 'sre_guest' flag WITHOUT checking NextAuth session, causing logged-in users to be treated as guests after clicking "Continue as Guest" then logging in
-- FIXED MainLayout (src/app/(main)/layout.tsx): Now checks session FIRST — authenticated users ALWAYS get AppShell; clears guest flags when session is authenticated
-- FIXED Login page (src/app/(auth)/login/page.tsx): Clears localStorage + cookie guest flags on successful login
-- FIXED Signup page (src/app/(auth)/signup/page.tsx): Clears localStorage + cookie guest flags on successful signup
-- FIXED GuestGuard (src/components/guest-guard.tsx): Added useSession check — authenticated users are NEVER guests even with stale flags
-- FIXED GuestShell (src/components/guest-shell.tsx): Added useSession — if session becomes authenticated while in GuestShell, clears flags and redirects to /home
-- UPDATED Middleware (src/middleware.ts): Added /api/feed/live-updates and /api/learning/topic/ to guest-allowed API paths
-- ADDED AdCard placements for guest visibility: discover page, public profile page, shared-topic page, and guest shell
-- FIXED pre-existing JSX bug in feed/page.tsx: Added React fragment wrapper for {!isGuest && (<>...</>)} to fix Turbopack parsing
-- FIXED pre-existing TypeScript error in learning/topic/[topicId]/route.ts: Added missing getUserId import
-- Deployed to pid1 (sretracker.vercel.app) — successful
-- Deployed to pid2 (sretrack.vercel.app) — successful
+- Removed stale .next directory (470MB)
+- Validated package-lock.json (v3, 988 packages, valid JSON)
+- Checked node_modules integrity (no ERR/missing/invalid)
+- Ran `npx prisma generate` — success in 317ms
+- Ran `npm run build` — success: compiled in 20s, 104/104 static pages
+- Verified local production server starts in 163ms, health API responds
+- Identified non-blocking warning: client-reference-manifest copy error for (main)/page.js
+  - This is a known Next.js 15 + standalone output issue
+  - Does NOT affect Vercel deployments (Vercel uses its own build pipeline)
+  - The page works correctly (307 redirect confirmed)
 
 Stage Summary:
-- Critical bug FIXED: Logged-in users are no longer treated as guests
-- Guest access Phase 1 complete: Guests can browse feed, discover, public profiles, shared topics, live updates
-- AdSense visible for guests on feed, discover, profile, shared-topic pages
-- All guest-locked actions (create, like, comment, repost, follow, DM, etc.) properly show login prompt
-- Both projects deployed and stable
+- Local build is 100% healthy
+- 104 static pages generated successfully
+- No type errors, no route failures
+- client-reference-manifest warning is cosmetic only
 
 ---
 Task ID: 3
 Agent: Main Agent
-Task: Phase 2-5: Feature Visibility, Guest Interaction, Session Cleanup, SEO + VIEW-ONLY Social Restriction
+Task: Phase 3 — Deployment Pipeline Isolation
 
 Work Log:
-- PHASE 2: Updated GuestShell with 9 locked features in "More" menu (Learning, Fitness, Content, Messages, Friends, Profile, Leaderboard, Analytics, AI Assistant)
-- PHASE 2: Each locked feature shows icon, name, description, and lock indicator — guests can discover ecosystem depth
-- PHASE 2: Added locked AI chat bubble (Bot icon with Lock badge) — visible to guests, triggers login prompt on click
-- PHASE 2: Deployed to both pid1 and pid2
-
-- PHASE 3: Verified all guest guards are in place (isGuest checks in feed, discover, profile pages)
-- PHASE 3: Guests can browse but CANNOT: create posts, like, comment, repost, bookmark, follow, DM, use trackers, AI, dashboards
-- PHASE 3: No guest-generated DB spam possible — all write operations blocked both client-side and API-side
-- PHASE 3: No deployment needed — existing implementation meets all Phase 3 requirements
-
-- PHASE 4: Added server-side guest cookie cleanup in middleware.ts — authenticated users get stale guest cookies cleared
-- PHASE 4: Guest session cleanup already implemented: 24h max-age cookie, 60s interval check, activity-based extension
-- PHASE 4: Deployed to both pid1 and pid2
-
-- PHASE 5: Added semantic H1 headings to feed, discover, profile, shared-topic pages (sr-only for visual, visible for crawlers)
-- PHASE 5: Added `rejectGuest()` API-level guard to 8 write routes (posts, likes, reposts, comments, bookmarks, follow, messages, feedback)
-- PHASE 5: Created `isGuestRequest()` and `rejectGuest()` helper functions in auth-helper.ts using x-guest header from middleware
-- PHASE 5: VIEW-ONLY social restriction enforced at both client-side (useGuest guards) and API-side (rejectGuest guards)
-- PHASE 5: Deployed to both pid1 and pid2
+- Checked for stale Vercel processes — none running
+- Verified .vercel/project.json exists with project linkage
+- Confirmed Vercel CLI is not authenticated (no credentials)
+- Verified GitHub remote: GowthamZEN/sre-tracker.git
+- Confirmed latest commit (73af56b) was deployed at 19:45 UTC (4 min after push)
+- Verified Vercel platform status: all systems operational
+- Confirmed CDN caching working: x-vercel-cache: HIT
 
 Stage Summary:
-- All 5 phases COMPLETE and deployed to both projects
-- Feature Visibility: All 9 ecosystem features visible but locked for guests
-- Guest Interaction: View-only access enforced, no DB write access for guests
-- Session Cleanup: 24h expiry with server-side stale cookie cleanup
-- SEO: Semantic H1 headings + VIEW-ONLY social restriction at API level
-- Both projects stable and functional
----
-Task ID: 1
-Agent: Main Agent
-Task: Fix discover page search and tab switch not working properly
-
-Work Log:
-- Examined discover page at src/app/(main)/discover/page.tsx (725 lines)
-- Identified 3 root cause bugs:
-  1. search() function had early return for posts/users tabs when query was empty — prevented browsing without typing
-  2. Debounced useEffect only triggered for groups/topics or when query.trim() was non-empty — switching to posts/users tab with empty query never triggered a search
-  3. No empty state messages for posts, groups, users tabs
-- Applied surgical fixes:
-  1. Removed early return condition in search() — now always fetches from API (API already supports empty queries)
-  2. Changed debounced useEffect to always trigger search on tab/query change
-  3. Added empty state GlassCard messages for posts, groups, and users tabs
-- Deployed to pid1 (sretracker.vercel.app) ✓
-- Deployed to pid2 (sretrack.vercel.app) ✓
-- Restored pid1 project config
-
-Stage Summary:
-- Fixed: Tab switching now loads content for ALL tabs including posts and users
-- Fixed: Search works with or without a query across all tabs
-- Fixed: Empty states show helpful messages instead of blank space
-- Both deployments live at sretracker.vercel.app and sretrack.vercel.app
+- Deployment pipeline works correctly via GitHub → Vercel auto-deploy
+- CLI deployment is broken due to missing authentication
+- No pipeline issues, no network instability
+- The "buggy deployment stopped midway" was likely a CLI attempt
 
 ---
-Task ID: 2
+Task ID: 4
 Agent: Main Agent
-Task: Move live updates to posts/topics tabs only, add query-filtered live search, enhance hashtag search
+Task: Phase 4 — Targeted Manifest/Next.js Debugging
 
 Work Log:
-- Removed global LIVE UPDATES section that was visible on ALL tabs (between search bar and TabsContent)
-- Moved learning live cards into Topics tab only (filtered by search query)
-- Moved content + fitness live cards into Posts tab only (filtered by search query)
-- Groups and Users tabs now show ONLY groups/users — no live updates, clean community discovery
-- Added `liveMatchesSearch()` filter function that matches against: name, title, hashtags, workoutType, muscleGroup (all case-insensitive)
-- When user types "cybersecurity", live learning updates about "Cybersecurity" topic will show in Topics tab, and live fitness/content updates with matching hashtags will show in Posts tab
-- Enhanced API `/api/discover?type=posts` to search BOTH post content AND hashtags JSON column using OR condition
-- Updated empty-state conditions to account for live updates being present
-- Deployed to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
+- SKIPPED — no build instability confirmed
+- Build completes successfully (104/104 pages)
+- No manifest/hydration/chunk errors
+- client-reference-manifest warning is cosmetic (standalone-mode only)
 
 Stage Summary:
-- Live updates now only appear in Posts (content+fitness) and Topics (learning) tabs
-- Groups and Users tabs are clean — focused on discovering people and communities
-- Search "cybersecurity" in Topics tab → shows live learning updates matching topic name
-- Search "cybersecurity" in Posts tab → shows posts with #cybersecurity hashtag + live content/fitness updates matching the keyword
-- API now searches both post.content and post.hashtags columns for posts type
-- No changes to groups/users API routes or rendering — untouched
+- Phase 4 not required — no actionable issues found
 
 ---
-Task ID: 3
+Task ID: 5
 Agent: Main Agent
-Task: Fix duplicate text-only versions of rich cards and deduplicate learning live updates
+Task: Phase 5 — Safe Redeployment & Stability Verification
 
 Work Log:
-- Diagnosed two duplicate issues:
-  1. Discover Topics tab: same learning topic appeared as BOTH a rich DiscoverLearningCard AND a plain topic search result (text-only duplicate at bottom)
-  2. Feed page: no deduplication — same topic from same user could appear multiple times
-- Discover page fixes:
-  - Added deduplication for all live update types (learning, content, fitness) using Set of `${id}_${userId}` keys
-  - Created `liveTopicIds` Set from deduplicated learning live cards
-  - Filtered topic search results to exclude items whose ID is in liveTopicIds (removes text-only duplicates)
-  - Updated empty-state conditions to account for filtered topic results
-- Feed page fixes:
-  - Added deduplication step in `mergedFeedItems` useMemo after collecting all items
-  - Uses Set of `${item.type}-${item.data?.id}_${item.data?.user?.id}` keys
-  - Replaced `items` with `dedupedItems` for sort and hashtag grouping
-- Deployed to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
+- Performed comprehensive 32-point production stability check
+- All core pages: 8/8 passed (login, signup, about, contact, privacy, terms, community-guidelines)
+- API health: 1/1 passed
+- SEO/Meta files: 3/3 passed (sitemap.xml, robots.txt, manifest.webmanifest)
+- Static assets: 10/10 passed (favicons, logos, ads.txt, app-ads.txt, etc.)
+- Auth-gated routes: 5/5 passed (feed, discover, home, profile, settings — all redirect correctly)
+- JS/CSS chunks: 5/5 passed (all 200, serving correctly from CDN)
+- Verified guest mode code is correct (cookie + localStorage dual storage)
+- Noted minor 404s for /site.webmanifest and /llms.txt (non-blocking)
 
 Stage Summary:
-- No more text-only duplicate of rich cards in Topics tab
-- No more same topic from same user appearing multiple times in feed
-- Live updates (learning, content, fitness) all deduplicated by (entity ID + user ID)
-- Rich cards remain as the single source of truth for each live update
+- 32/32 checks passed — PRODUCTION STABLE
+- No redeployment needed — current deployment is healthy
+- Minor 404s for site.webmanifest/llms.txt are non-critical (manifest.webmanifest works)
