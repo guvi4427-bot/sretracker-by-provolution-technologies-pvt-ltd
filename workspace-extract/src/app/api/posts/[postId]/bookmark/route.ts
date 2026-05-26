@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { rejectGuest } from '@/lib/auth-helper';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const guestRejected = rejectGuest(req); if (guestRejected) return guestRejected;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -37,6 +39,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const guestRejected = rejectGuest(req); if (guestRejected) return guestRejected;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

@@ -41,6 +41,9 @@ export default function LoginPage() {
         return;
       }
       toast.success(t('auth.welcomeBack'));
+      // Clear guest flags on successful login to prevent stale guest state
+      localStorage.removeItem('sre_guest');
+      document.cookie = 'sre_guest=; path=/; max-age=0';
       const sessionRes = await fetch('/api/auth/session');
       const session = await sessionRes.json();
       if (session?.user) {

@@ -22,10 +22,12 @@ const GUEST_ALLOWED_PATHS = [
 // API routes that guests can access (read-only public data)
 const GUEST_ALLOWED_API_PATHS = [
   "/api/feed",
+  "/api/feed/live-updates",
   "/api/discover",
   "/api/user/public",
   "/api/posts",      // GET only — POST is blocked at the API level
   "/api/learning/topic",  // GET only — for shared topic viewing
+  "/api/learning/topic/", // GET specific topic by ID
 ];
 
 export async function middleware(request: NextRequest) {
@@ -85,6 +87,13 @@ export async function middleware(request: NextRequest) {
       // Guest accessing allowed path — inject guest header for API-level checks
       const response = NextResponse.next();
       response.headers.set("x-guest", "true");
+      return response;
+    }
+
+    // Authenticated user — clear any stale guest cookie if present
+    if (token && isGuest) {
+      const response = NextResponse.next();
+      response.cookies.set("sre_guest", "", { path: "/", maxAge: 0 });
       return response;
     }
 

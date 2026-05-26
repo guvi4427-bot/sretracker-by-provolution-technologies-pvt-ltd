@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { checkAndNotifyEligibleAchievements } from '@/lib/achievements';
+import { rejectGuest } from '@/lib/auth-helper';
 
 export async function GET(req: Request) {
   try {
@@ -76,6 +77,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const guestRejected = rejectGuest(req); if (guestRejected) return guestRejected;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

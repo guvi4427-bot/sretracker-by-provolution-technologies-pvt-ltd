@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { awardXP, updateStreak } from '@/lib/xp';
 import { safeJsonParse } from '@/lib/utils';
+import { rejectGuest } from '@/lib/auth-helper';
 
 export async function GET(req: NextRequest) {
   try {
@@ -237,6 +238,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const guestRejected = rejectGuest(req); if (guestRejected) return guestRejected;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

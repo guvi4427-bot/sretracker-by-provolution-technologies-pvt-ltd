@@ -871,6 +871,8 @@ export default function FeedPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {/* Semantic heading for SEO/crawlers — visually hidden */}
+      <h1 className="sr-only">Community Feed — {t('app.name')}</h1>
       <Tabs value={activeFeedTab} onValueChange={setActiveFeedTab}>
         <TabsList className="bg-accent border border-border w-full flex">
           <TabsTrigger value="feed" className="text-muted-foreground data-[state=active]:text-blue-400 flex-1"><Rss size={14} className="mr-1" />Feed</TabsTrigger>
@@ -950,7 +952,7 @@ export default function FeedPage() {
             </GlassCard>
           )}
           {/* Your Fitness Dashboard — auth only */}
-          {!isGuest && (
+          {!isGuest && (<>
           <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Dumbbell size={16} className="text-blue-400" />
@@ -1094,7 +1096,7 @@ export default function FeedPage() {
               </div>
             )}
           </GlassCard>
-          )}
+          </>)}
         </TabsContent>
 
         {/* My Posts Tab */}

@@ -9,6 +9,7 @@ import {
   Loader2, Globe, ChevronRight, MessageCircle, User, Eye
 } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUserStore } from '@/stores/user-store';
@@ -114,6 +115,12 @@ function SharedTopicContent() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
+      {/* Ad placement — visible for both guests and signed-in users */}
+      <AdCard format="in-feed" slot="shared_topic_top" />
+
+      {/* Semantic heading for SEO/crawlers — visually hidden */}
+      <h1 className="sr-only">{topic.name} — Shared Learning Collection</h1>
+
       {/* Back button */}
       <button
         onClick={goBack}

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -505,6 +506,8 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      {/* Semantic heading for SEO/crawlers — visually hidden */}
+      <h1 className="sr-only">Discover — {t('app.name')}</h1>
       {/* Search */}
       <GlassCard className="p-4">
         <div className="flex gap-2">
@@ -512,6 +515,9 @@ export default function DiscoverPage() {
           <Button onClick={() => search()} className="gradient-blue">{t('common.search')}</Button>
         </div>
       </GlassCard>
+
+      {/* Ad placement — visible for both guests and signed-in users */}
+      <AdCard format="in-feed" slot="discover_top" />
 
       {/* ═══ LIVE UPDATES SECTION — always visible at top, rich cards ═══ */}
       {!liveLoading && allLiveUpdates.length > 0 && (

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { BadgeCheck, Zap, Flame, Star, Trophy, UserPlus, UserMinus, BookOpen, Clock, Flag, AlertTriangle, Loader2, Dumbbell, Video, Share2, FileText, Film, Edit3, ExternalLink, PenTool, Check, Lock } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
+import { AdCard } from '@/components/ad-banner';
 import { XPBar } from '@/components/xp-bar';
 import { StreakBadge } from '@/components/streak-badge';
 import { Button } from '@/components/ui/button';
@@ -331,6 +332,12 @@ export default function PublicProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
+      {/* Ad placement — visible for both guests and signed-in users */}
+      <AdCard format="in-feed" slot="profile_top" />
+
+      {/* Semantic heading for SEO/crawlers — visually hidden */}
+      <h1 className="sr-only">{p.name || 'User'} — {t('app.name')} Profile</h1>
+
       <GlassCard className="p-6">
         <div className="flex items-start gap-4">
           <Avatar className="h-20 w-20 border border-border"><AvatarFallback className="bg-blue-600/30 text-blue-300 text-2xl">{p.name?.[0] || '?'}</AvatarFallback></Avatar>

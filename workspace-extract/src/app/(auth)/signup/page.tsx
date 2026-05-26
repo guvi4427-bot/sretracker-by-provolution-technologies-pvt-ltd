@@ -123,6 +123,9 @@ export default function SignupPage() {
         return;
       }
       toast.success(t('auth.welcomeToSRE'));
+      // Clear guest flags on successful signup to prevent stale guest state
+      localStorage.removeItem('sre_guest');
+      document.cookie = 'sre_guest=; path=/; max-age=0';
       router.push('/onboarding');
       router.refresh();
     } catch {

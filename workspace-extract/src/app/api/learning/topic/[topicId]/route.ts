@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserIdOrNull } from '@/lib/auth-helper';
+import { getUserId, getUserIdOrNull } from '@/lib/auth-helper';
 
 export async function GET(
   request: Request,

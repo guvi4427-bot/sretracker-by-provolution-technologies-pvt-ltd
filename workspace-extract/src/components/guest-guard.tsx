@@ -3,6 +3,7 @@
 import { useState, createContext, useContext, useCallback, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { LogIn, UserPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SITE_NAME } from '@/lib/site-config';
@@ -27,10 +28,14 @@ export function GuestProvider({ children }: { children: ReactNode }) {
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptAction, setPromptAction] = useState('');
   const router = useRouter();
+  const { status: sessionStatus } = useSession();
 
-  // Check if user is a guest by looking for the guest marker
+  // Check if user is a guest: only true if unauthenticated AND guest flag is set.
+  // Authenticated users are NEVER guests, even if stale flags exist.
   const isGuest =
-    typeof window !== 'undefined' && localStorage.getItem('sre_guest') === 'true';
+    sessionStatus !== 'authenticated' &&
+    typeof window !== 'undefined' &&
+    localStorage.getItem('sre_guest') === 'true';
 
   const showLoginPrompt = useCallback((action?: string) => {
     setPromptAction(action || 'this feature');
