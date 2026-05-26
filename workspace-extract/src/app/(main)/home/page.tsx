@@ -123,9 +123,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Ad Banner — between stats and daily quests */}
-      <AdCard format="in-feed" slot="home_mid" />
-
       {(quests.length > 0 || true) && (
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('home.dailyQuests')}</h3>
@@ -194,6 +191,9 @@ export default function HomePage() {
           )}
         </div>
       </GlassCard>
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="home_bottom" />
     </div>
   );
 }

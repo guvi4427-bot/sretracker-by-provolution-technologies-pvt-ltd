@@ -332,9 +332,6 @@ export default function PublicProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      {/* Ad placement — visible for both guests and signed-in users */}
-      <AdCard format="in-feed" slot="profile_top" />
-
       {/* Semantic heading for SEO/crawlers — visually hidden */}
       <h1 className="sr-only">{p.name || 'User'} — {t('app.name')} Profile</h1>
 
@@ -676,6 +673,9 @@ export default function PublicProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="profile_bottom" />
     </div>
   );
 }

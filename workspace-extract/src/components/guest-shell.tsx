@@ -154,11 +154,6 @@ function GuestShellInner({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </ErrorBoundary>
 
-        {/* Ad placement for guest users — visible on all guest pages */}
-        <div className="mt-4">
-          <AdCard format="in-feed" slot="guest_feed_mid" />
-        </div>
-
         {/* Guest banner */}
         <div className="mt-4 p-4 rounded-xl bg-blue-600/10 border border-blue-500/20 text-center">
           <p className="text-sm text-foreground font-medium">Want to interact and track your progress?</p>
@@ -180,6 +175,11 @@ function GuestShellInner({ children }: { children: React.ReactNode }) {
               <UserPlus size={14} className="mr-1" /> Sign Up
             </Button>
           </div>
+        </div>
+
+        {/* Ad Banner — bottom of page, above footer */}
+        <div className="mt-4">
+          <AdCard format="in-feed" slot="guest_bottom" />
         </div>
 
         {/* Footer Links */}

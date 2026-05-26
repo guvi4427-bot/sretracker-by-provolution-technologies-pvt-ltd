@@ -47,9 +47,6 @@ export default function LeaderboardPage() {
 
       <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('common.search')} className="bg-accent border-border text-foreground placeholder:text-muted-foreground/50" />
 
-      {/* Subtle ad between search and leaderboard list */}
-      <AdCard format="in-feed" slot="leaderboard_top" />
-
       {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> : (
         <div className="space-y-2">
           {users.filter((u: any) => !search || (u.name || '').toLowerCase().includes(search.toLowerCase())).map((u: any, i: number) => {
@@ -67,6 +64,9 @@ export default function LeaderboardPage() {
           })}
         </div>
       )}
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="leaderboard_bottom" />
     </div>
   );
 }

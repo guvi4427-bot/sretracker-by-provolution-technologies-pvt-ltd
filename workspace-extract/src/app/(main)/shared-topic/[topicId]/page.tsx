@@ -115,9 +115,6 @@ function SharedTopicContent() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      {/* Ad placement — visible for both guests and signed-in users */}
-      <AdCard format="in-feed" slot="shared_topic_top" />
-
       {/* Semantic heading for SEO/crawlers — visually hidden */}
       <h1 className="sr-only">{topic.name} — Shared Learning Collection</h1>
 
@@ -279,6 +276,9 @@ function SharedTopicContent() {
           </div>
         </div>
       </GlassCard>
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="shared_topic_bottom" />
     </div>
   );
 }

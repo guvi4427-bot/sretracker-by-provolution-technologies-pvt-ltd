@@ -508,16 +508,23 @@ export default function DiscoverPage() {
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Semantic heading for SEO/crawlers — visually hidden */}
       <h1 className="sr-only">Discover — {t('app.name')}</h1>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-accent border border-border w-full flex">
+          {TABS.map(tab => (
+            <TabsTrigger key={tab} value={tab} className="text-muted-foreground text-xs flex-1 data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20">
+              {t(`discover.${tab}`)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
       {/* Search */}
-      <GlassCard className="p-4">
+      <GlassCard className="p-4 mt-4">
         <div className="flex gap-2">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} /><Input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder={t('discover.searchPlaceholder')} className="bg-accent border-border text-foreground pl-10 placeholder:text-muted-foreground/50" /></div>
           <Button onClick={() => search()} className="gradient-blue">{t('common.search')}</Button>
         </div>
       </GlassCard>
-
-      {/* Ad placement — visible for both guests and signed-in users */}
-      <AdCard format="in-feed" slot="discover_top" />
 
       {/* ═══ LIVE UPDATES SECTION — always visible at top, rich cards ═══ */}
       {!liveLoading && allLiveUpdates.length > 0 && (
@@ -588,15 +595,6 @@ export default function DiscoverPage() {
           </div>
         </GlassCard>
       )}
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-accent border border-border w-full flex">
-          {TABS.map(tab => (
-            <TabsTrigger key={tab} value={tab} className="text-muted-foreground text-xs flex-1 data-[state=active]:text-blue-400 data-[state=active]:bg-blue-600/20">
-              {t(`discover.${tab}`)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
 
         <TabsContent value="posts" className="space-y-3 mt-4">
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
@@ -718,6 +716,9 @@ export default function DiscoverPage() {
           ))}
         </TabsContent>
       </Tabs>
+
+      {/* Ad Banner — bottom of page, above footer */}
+      <AdCard format="in-feed" slot="discover_bottom" />
     </div>
   );
 }
