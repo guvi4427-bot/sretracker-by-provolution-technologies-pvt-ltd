@@ -5,31 +5,62 @@ import { Cookie, X } from 'lucide-react';
 
 const COOKIE_CONSENT_KEY = 'sre_cookie_consent';
 
+/**
+ * CookieConsent — Manages user consent for cookies and personalized ads.
+ *
+ * When the user accepts, it signals Google AdSense to serve personalized ads.
+ * When dismissed or not yet consented, AdSense falls back to non-personalized ads.
+ * Consent state is persisted in localStorage so the banner doesn't reappear.
+ */
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Check if user has already consented
     try {
       const consent = localStorage.getItem(COOKIE_CONSENT_KEY);
       if (!consent) {
         // Show banner after a short delay so it doesn't flash on every page load
         const timer = setTimeout(() => setVisible(true), 1500);
         return () => clearTimeout(timer);
+      } else {
+        // User already consented — signal AdSense for personalized ads
+        applyConsentToAdsense(true);
       }
     } catch {
       // localStorage not available
     }
   }, []);
 
+  function applyConsentToAdsense(personalized: boolean) {
+    try {
+      const adsbygoogle = (window as any).adsbygoogle;
+      if (adsbygoogle) {
+        if (!personalized) {
+          // Request non-personalized ads until user consents
+          adsbygoogle.requestNonPersonalizedAds = 1;
+        } else {
+          // Allow personalized ads after consent
+          adsbygoogle.requestNonPersonalizedAds = 0;
+        }
+        // Push consent update to AdSense
+        adsbygoogle.pauseAdRequests = 0;
+      }
+    } catch {
+      // AdSense not loaded yet
+    }
+  }
+
   function accept() {
     try {
       localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ accepted: true, timestamp: Date.now() }));
     } catch {}
+    applyConsentToAdsense(true);
     setVisible(false);
   }
 
   function dismiss() {
+    // User dismissed without accepting — keep non-personalized ads
+    applyConsentToAdsense(false);
     setVisible(false);
   }
 

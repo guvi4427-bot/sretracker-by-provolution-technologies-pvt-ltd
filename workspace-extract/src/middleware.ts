@@ -9,7 +9,7 @@ const PUBLIC_PATHS = [
   "/favicon", "/favicon-96x96.png", "/favicon.ico", "/apple-touch-icon.png",
   "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
   "/manifest.webmanifest", "/site.webmanifest", "/public",
-  "/logo.svg", "/logo.png", "/ads.txt", "/robots.txt", "/sitemap.xml",
+  "/logo.svg", "/logo.png", "/ads.txt", "/app-ads.txt", "/robots.txt", "/sitemap.xml",
 ];
 
 // Paths that guests can browse (read-only, no interaction)
@@ -46,6 +46,8 @@ export async function middleware(request: NextRequest) {
     pathname.includes("logo.svg") ||
     pathname.includes("logo.png") ||
     pathname.endsWith(".txt") ||
+    pathname === "/ads.txt" ||
+    pathname === "/app-ads.txt" ||
     pathname.endsWith(".xml") ||
     pathname.endsWith(".webmanifest") ||
     pathname.endsWith(".ico")
