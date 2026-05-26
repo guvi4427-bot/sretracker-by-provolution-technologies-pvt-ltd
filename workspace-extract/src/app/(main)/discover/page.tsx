@@ -541,9 +541,27 @@ export default function DiscoverPage() {
       </GlassCard>
 
         <TabsContent value="posts" className="space-y-3 mt-4">
-          {/* ═══ LIVE UPDATES in Posts tab: content + fitness live cards ═══ */}
-          {!liveLoading && (filteredContentLive.length > 0 || filteredFitnessLive.length > 0) && (
+          {/* ═══ LIVE UPDATES in Posts tab: learning + content + fitness rich cards ═══ */}
+          {!liveLoading && (filteredLearningLive.length > 0 || filteredContentLive.length > 0 || filteredFitnessLive.length > 0) && (
             <div className="space-y-3">
+              {/* Learning Live Topic Updates */}
+              {filteredLearningLive.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <BookOpen size={14} className="text-cyan-400" />
+                    <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                    <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredLearningLive.length} update{filteredLearningLive.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredLearningLive.map((u: any) => (
+                      <DiscoverLearningCard key={u.id} update={u} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Content Live Updates */}
               {filteredContentLive.length > 0 && (
                 <div>
@@ -593,9 +611,9 @@ export default function DiscoverPage() {
             </GlassCard>
           )}
 
-          {/* Post search results */}
+          {/* Text posts from feed — raw/simple style */}
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
-          (Array.isArray(results.posts) ? results.posts : []).length === 0 && !liveLoading && filteredContentLive.length === 0 && filteredFitnessLive.length === 0 ? (
+          (Array.isArray(results.posts) ? results.posts : []).length === 0 && !liveLoading && filteredLearningLive.length === 0 && filteredContentLive.length === 0 && filteredFitnessLive.length === 0 ? (
             <GlassCard className="p-8 text-center">
               <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No posts found</p>
