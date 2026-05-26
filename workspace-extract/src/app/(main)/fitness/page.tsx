@@ -105,6 +105,7 @@ export default function FitnessPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileReady, setProfileReady] = useState(false); // Prevents form flash before first load
+  const [initialFetchDone, setInitialFetchDone] = useState(false); // Extra guard against flash
 
   // Unit conversion helpers
   const isImperial = profileForm.unitSystem === 'imperial';
@@ -210,35 +211,41 @@ export default function FitnessPage() {
   }, []);
 
   useEffect(() => {
+    // Fetch primary data first (profile, today's food/workouts/weights)
     fetchProfile(); fetchFoodLogs(); fetchWorkouts(); fetchWeights();
-    // Load past 7 days of nutrition + workout history in parallel (batched)
-    const last7 = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (i + 1));
-      return d.toISOString().split('T')[0];
-    });
-    Promise.all(last7.map(async dateStr => {
-      try {
-        const [foodRes, workoutRes] = await Promise.all([
-          fetch(`/api/fitness/food?date=${dateStr}`),
-          fetch(`/api/fitness/workout?date=${dateStr}`),
-        ]);
-        let fLogs: any[] = [];
-        let wLogs: any[] = [];
-        if (foodRes.ok) { const d = await foodRes.json(); fLogs = Array.isArray(d) ? d : d.foodLogs || []; }
-        if (workoutRes.ok) { const d = await workoutRes.json(); wLogs = Array.isArray(d) ? d : d.workouts || []; }
-        return { dateStr, foodLogs: fLogs, workoutLogs: wLogs };
-      } catch {}
-      return { dateStr, foodLogs: [] as any[], workoutLogs: [] as any[] };
-    })).then(results => {
-      const foodMap: Record<string, any[]> = {};
-      const workoutMap: Record<string, any[]> = {};
-      results.forEach(r => {
-        foodMap[r.dateStr] = r.foodLogs;
-        workoutMap[r.dateStr] = r.workoutLogs;
+    // Load past 7 days of nutrition + workout history in background (deferred)
+    const timer = setTimeout(() => {
+      const last7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (i + 1));
+        return d.toISOString().split('T')[0];
       });
-      setNutritionHistory(prev => ({ ...prev, ...foodMap }));
-      setWorkoutHistory(prev => ({ ...prev, ...workoutMap }));
-    });
+      Promise.all(last7.map(async dateStr => {
+        try {
+          const [foodRes, workoutRes] = await Promise.all([
+            fetch(`/api/fitness/food?date=${dateStr}`),
+            fetch(`/api/fitness/workout?date=${dateStr}`),
+          ]);
+          let fLogs: any[] = [];
+          let wLogs: any[] = [];
+          if (foodRes.ok) { const d = await foodRes.json(); fLogs = Array.isArray(d) ? d : d.foodLogs || []; }
+          if (workoutRes.ok) { const d = await workoutRes.json(); wLogs = Array.isArray(d) ? d : d.workouts || []; }
+          return { dateStr, foodLogs: fLogs, workoutLogs: wLogs };
+        } catch {}
+        return { dateStr, foodLogs: [] as any[], workoutLogs: [] as any[] };
+      })).then(results => {
+        const foodMap: Record<string, any[]> = {};
+        const workoutMap: Record<string, any[]> = {};
+        results.forEach(r => {
+          foodMap[r.dateStr] = r.foodLogs;
+          workoutMap[r.dateStr] = r.workoutLogs;
+        });
+        setNutritionHistory(prev => ({ ...prev, ...foodMap }));
+        setWorkoutHistory(prev => ({ ...prev, ...workoutMap }));
+        // Mark initial fetch as complete — prevents form flash
+        setInitialFetchDone(true);
+      });
+    }, 100); // Small delay to let primary data render first
+    return () => { clearTimeout(timer); setInitialFetchDone(true); };
   }, [fetchProfile, fetchFoodLogs, fetchWorkouts, fetchWeights]);
 
   const totalMacros = foodLogs.reduce((acc: any, f: any) => ({
@@ -428,6 +435,8 @@ export default function FitnessPage() {
           setWeightLogs(prev => [...prev, newWeight]);
         }
         setWeightValue('');
+        // Update profileForm weight so computed macros update immediately
+        setProfileForm(p => ({ ...p, weight: isImperial ? kgToLbs(weightKg).toString() : weightKg.toString() }));
         fetchWeights(); // background sync
         // Await profile refresh so macros/TDEE update immediately
         await fetchProfile();
@@ -508,7 +517,7 @@ export default function FitnessPage() {
               )}
             </div>
 
-            {!profileReady ? (
+            {!profileReady || !initialFetchDone ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
               </div>
@@ -1319,15 +1328,19 @@ export default function FitnessPage() {
               const logs = dateStr === today ? foodLogs : (nutritionHistory[dateStr] || []);
               const dayWorkouts = allWorkoutsDeduped.filter((w: any) => {
                 if (!w.date) return false;
-                if (w.date === dateStr) return true;
-                try { return new Date(w.date).toISOString().split('T')[0] === dateStr; } catch { return false; }
+                // Normalize both dates to YYYY-MM-DD for comparison
+                const wDate = typeof w.date === 'string' ? w.date.split('T')[0] : new Date(w.date).toISOString().split('T')[0];
+                return wDate === dateStr;
               });
               const consumed = logs.reduce((a: number, f: any) => a + (f.calories || 0), 0);
               const burned = dayWorkouts.reduce((a: number, w: any) => a + (w.estimatedCalories || 0), 0);
               return { date: dateStr.slice(5), consumed, burned };
             });
             const hasAnyData = calorieChartData.some(d => d.consumed > 0 || d.burned > 0);
-            if (!hasAnyData) {
+            // Also check if we have any nutrition or workout data at all (history may not be loaded yet)
+            const hasFoodData = foodLogs.length > 0 || Object.keys(nutritionHistory).some(k => (nutritionHistory[k] || []).length > 0);
+            const hasWorkoutData = allWorkoutsDeduped.length > 0;
+            if (!hasAnyData && !hasFoodData && !hasWorkoutData) {
               return (
                 <GlassCard variant="glowing" className="p-4">
                   <div className="flex items-center gap-2 mb-3">

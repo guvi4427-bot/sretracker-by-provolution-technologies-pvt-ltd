@@ -117,16 +117,17 @@ export default function PublicProfilePage() {
               followingCount: serverFollowing ?? 0,
             };
           }
-          // Merge strategy: use the HIGHER of server vs optimistic local count.
-          // This prevents the count from temporarily dropping to 0 due to DB
-          // replication lag after a follow/unfollow action.
+          // Merge strategy: only overwrite local count with server data when
+          // server returns a positive value. This prevents DB replication lag
+          // from wiping out optimistic counts (e.g. server returns 0 right
+          // after a follow because the read replica hasn't caught up yet).
           const prevFollowers = prev.followersCount ?? 0;
           const prevFollowing = prev.followingCount ?? 0;
           return {
             ...prev,
             ...data,
-            followersCount: serverFollowers !== undefined ? Math.max(serverFollowers, prevFollowers) : prevFollowers,
-            followingCount: serverFollowing !== undefined ? Math.max(serverFollowing, prevFollowing) : prevFollowing,
+            followersCount: (serverFollowers !== undefined && serverFollowers > 0) ? serverFollowers : prevFollowers,
+            followingCount: (serverFollowing !== undefined && serverFollowing > 0) ? serverFollowing : prevFollowing,
           };
         });
       }
@@ -258,8 +259,27 @@ export default function PublicProfilePage() {
       window.dispatchEvent(new CustomEvent('follow-updated'));
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
-      // Delayed server refresh to get full authoritative data
-      setTimeout(() => { loadUser(); }, 1500);
+      // Delayed server refresh for count reconciliation — only update counts if server returns > 0
+      // This prevents DB replication lag from overwriting optimistic counts with stale zeros
+      setTimeout(async () => {
+        try {
+          const r = await fetch(`/api/user/public/${userId}?_t=` + Date.now(), { cache: 'no-store' });
+          if (r.ok) {
+            const data = await r.json();
+            const sFollowers = typeof data.followersCount === 'number' ? data.followersCount : undefined;
+            const sFollowing = typeof data.followingCount === 'number' ? data.followingCount : undefined;
+            // Only update if server returns actual non-negative counts (skip 0 from replication lag)
+            setUserData((prev: any) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                followersCount: sFollowers !== undefined && sFollowers > 0 ? sFollowers : prev.followersCount,
+                followingCount: sFollowing !== undefined && sFollowing > 0 ? sFollowing : prev.followingCount,
+              };
+            });
+          }
+        } catch {}
+      }, 2000);
     } catch {}
   }
 

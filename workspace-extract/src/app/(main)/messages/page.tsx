@@ -162,11 +162,12 @@ export default function MessagesPage() {
   useEffect(() => { fetchConversations(); fetchGroups(); setLoading(false); }, [fetchConversations, fetchGroups]);
 
   // Auto-start DM when navigated from friends tab with ?userId=xxx
-  const dmInitRef = useRef(false);
+  const dmInitRef = useRef<string|null>(null); // Track which userId we've already init'd
   useEffect(() => {
     const targetUserId = searchParams.get('userId');
-    if (!targetUserId || !profile?.userId || dmInitRef.current) return;
-    dmInitRef.current = true; // Prevent re-trigger
+    if (!targetUserId || !profile?.userId) return;
+    if (dmInitRef.current === targetUserId) return; // Already init'd this user
+    dmInitRef.current = targetUserId;
     // Fetch target user's profile FIRST to ensure we have the name
     (async () => {
       try {
@@ -215,6 +216,15 @@ export default function MessagesPage() {
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
+  // Sync activeConvOtherUser name from conversations list when conversations update
+  useEffect(() => {
+    if (!activeConv || !activeConvOtherUser) return;
+    const conv = conversations.find((c: any) => c.id === activeConv);
+    if (conv?.otherUser?.name && (!activeConvOtherUser.name || activeConvOtherUser.name === 'User')) {
+      setActiveConvOtherUser((prev: any) => prev ? { ...prev, name: conv.otherUser.name, username: conv.otherUser.username || prev.username } : prev);
+    }
+  }, [conversations, activeConv, activeConvOtherUser]);
+
   // Polling
   useEffect(() => {
     pollRef.current = setInterval(() => {
@@ -245,7 +255,18 @@ export default function MessagesPage() {
     setActiveConv(convId);
     setActiveGroup(null);
     setMobileShowChat(true);
-    if (otherUser) setActiveConvOtherUser(otherUser);
+    // Always use the latest user info; prefer the fetched otherUser, fallback to conversations list
+    if (otherUser && otherUser.name && otherUser.name !== 'User') {
+      setActiveConvOtherUser(otherUser);
+    } else {
+      // Try to get from conversations list
+      const conv = conversations.find((c: any) => c.id === convId);
+      if (conv?.otherUser) {
+        setActiveConvOtherUser(conv.otherUser);
+      } else if (otherUser) {
+        setActiveConvOtherUser(otherUser);
+      }
+    }
     try {
       const r = await fetch(`/api/messages/${convId}`);
       if (r.ok) {
