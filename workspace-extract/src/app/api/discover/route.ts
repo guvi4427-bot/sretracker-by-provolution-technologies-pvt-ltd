@@ -24,7 +24,10 @@ export async function GET(req: Request) {
     if (type === 'posts') {
       const posts = await db.post.findMany({
         where: {
-          ...(q ? { content: { contains: q, mode: 'insensitive' } } : {}),
+          ...(q ? { OR: [
+            { content: { contains: q, mode: 'insensitive' } },
+            { hashtags: { contains: q, mode: 'insensitive' } },
+          ] } : {}),
         },
         take: 20, orderBy: { createdAt: 'desc' },
         include: {

@@ -129,3 +129,27 @@ Stage Summary:
 - Fixed: Search works with or without a query across all tabs
 - Fixed: Empty states show helpful messages instead of blank space
 - Both deployments live at sretracker.vercel.app and sretrack.vercel.app
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Move live updates to posts/topics tabs only, add query-filtered live search, enhance hashtag search
+
+Work Log:
+- Removed global LIVE UPDATES section that was visible on ALL tabs (between search bar and TabsContent)
+- Moved learning live cards into Topics tab only (filtered by search query)
+- Moved content + fitness live cards into Posts tab only (filtered by search query)
+- Groups and Users tabs now show ONLY groups/users — no live updates, clean community discovery
+- Added `liveMatchesSearch()` filter function that matches against: name, title, hashtags, workoutType, muscleGroup (all case-insensitive)
+- When user types "cybersecurity", live learning updates about "Cybersecurity" topic will show in Topics tab, and live fitness/content updates with matching hashtags will show in Posts tab
+- Enhanced API `/api/discover?type=posts` to search BOTH post content AND hashtags JSON column using OR condition
+- Updated empty-state conditions to account for live updates being present
+- Deployed to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
+
+Stage Summary:
+- Live updates now only appear in Posts (content+fitness) and Topics (learning) tabs
+- Groups and Users tabs are clean — focused on discovering people and communities
+- Search "cybersecurity" in Topics tab → shows live learning updates matching topic name
+- Search "cybersecurity" in Posts tab → shows posts with #cybersecurity hashtag + live content/fitness updates matching the keyword
+- API now searches both post.content and post.hashtags columns for posts type
+- No changes to groups/users API routes or rendering — untouched

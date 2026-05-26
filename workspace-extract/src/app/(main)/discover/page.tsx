@@ -503,6 +503,21 @@ export default function DiscoverPage() {
   const contentLive = liveContentUpdates;
   const fitnessLive = [...liveFitnessUpdates, ...liveWeightUpdates];
 
+  // Filter live updates by search query (case-insensitive match on name, title, hashtags, content keywords)
+  const lowerQuery = query.trim().toLowerCase();
+  function liveMatchesSearch(update: any): boolean {
+    if (!lowerQuery) return true;
+    const name = (update.name || '').toLowerCase();
+    const title = (update.title || '').toLowerCase();
+    const tags = (update.hashtags || []).map((h: string) => h.toLowerCase());
+    const workoutType = (update.workoutType || '').toLowerCase();
+    const muscleGroup = (update.muscleGroup || '').toLowerCase();
+    return name.includes(lowerQuery) || title.includes(lowerQuery) || tags.some((t: string) => t.includes(lowerQuery)) || workoutType.includes(lowerQuery) || muscleGroup.includes(lowerQuery);
+  }
+  const filteredLearningLive = learningLive.filter(liveMatchesSearch);
+  const filteredContentLive = contentLive.filter(liveMatchesSearch);
+  const filteredFitnessLive = fitnessLive.filter(liveMatchesSearch);
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Semantic heading for SEO/crawlers — visually hidden */}
@@ -525,79 +540,62 @@ export default function DiscoverPage() {
         </div>
       </GlassCard>
 
-      {/* ═══ LIVE UPDATES SECTION — always visible at top, rich cards ═══ */}
-      {!liveLoading && allLiveUpdates.length > 0 && (
-        <div className="space-y-3">
-          {/* Learning Live Updates */}
-          {learningLive.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <BookOpen size={14} className="text-cyan-400" />
-                <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
-                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                <span className="text-[9px] text-muted-foreground/50 ml-1">{learningLive.length} update{learningLive.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="space-y-3">
-                {learningLive.map((u: any) => (
-                  <DiscoverLearningCard key={u.id} update={u} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Content Live Updates */}
-          {contentLive.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Video size={14} className="text-purple-400" />
-                <h3 className="text-sm font-medium text-purple-400">#content</h3>
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
-                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                <span className="text-[9px] text-muted-foreground/50 ml-1">{contentLive.length} update{contentLive.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="space-y-3">
-                {contentLive.map((u: any) => (
-                  <DiscoverContentCard key={u.id} update={u} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Fitness Live Updates */}
-          {fitnessLive.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Dumbbell size={14} className="text-green-400" />
-                <h3 className="text-sm font-medium text-green-400">#fitness</h3>
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
-                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                <span className="text-[9px] text-muted-foreground/50 ml-1">{fitnessLive.length} update{fitnessLive.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="space-y-3">
-                {fitnessLive.map((u: any) => (
-                  <DiscoverFitnessCard key={u.id} update={u} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Live loading skeleton */}
-      {liveLoading && (
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Activity size={14} className="text-green-400" />
-            <span className="text-sm text-muted-foreground">Loading live updates...</span>
-            <Loader2 size={14} className="text-green-400 animate-spin ml-1" />
-          </div>
-        </GlassCard>
-      )}
-
         <TabsContent value="posts" className="space-y-3 mt-4">
+          {/* ═══ LIVE UPDATES in Posts tab: content + fitness live cards ═══ */}
+          {!liveLoading && (filteredContentLive.length > 0 || filteredFitnessLive.length > 0) && (
+            <div className="space-y-3">
+              {/* Content Live Updates */}
+              {filteredContentLive.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Video size={14} className="text-purple-400" />
+                    <h3 className="text-sm font-medium text-purple-400">#content</h3>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                    <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredContentLive.length} update{filteredContentLive.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredContentLive.map((u: any) => (
+                      <DiscoverContentCard key={u.id} update={u} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fitness Live Updates */}
+              {filteredFitnessLive.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Dumbbell size={14} className="text-green-400" />
+                    <h3 className="text-sm font-medium text-green-400">#fitness</h3>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                    <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredFitnessLive.length} update{filteredFitnessLive.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredFitnessLive.map((u: any) => (
+                      <DiscoverFitnessCard key={u.id} update={u} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live loading skeleton for posts tab */}
+          {liveLoading && (
+            <GlassCard className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity size={14} className="text-green-400" />
+                <span className="text-sm text-muted-foreground">Loading live updates...</span>
+                <Loader2 size={14} className="text-green-400 animate-spin ml-1" />
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Post search results */}
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
-          (Array.isArray(results.posts) ? results.posts : []).length === 0 ? (
+          (Array.isArray(results.posts) ? results.posts : []).length === 0 && !liveLoading && filteredContentLive.length === 0 && filteredFitnessLive.length === 0 ? (
             <GlassCard className="p-8 text-center">
               <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No posts found</p>
@@ -616,6 +614,36 @@ export default function DiscoverPage() {
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-3 mt-4">
+          {/* ═══ LIVE UPDATES in Topics tab: learning live cards ═══ */}
+          {!liveLoading && filteredLearningLive.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <BookOpen size={14} className="text-cyan-400" />
+                <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
+                <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredLearningLive.length} update{filteredLearningLive.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-3">
+                {filteredLearningLive.map((u: any) => (
+                  <DiscoverLearningCard key={u.id} update={u} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Live loading skeleton for topics tab */}
+          {liveLoading && (
+            <GlassCard className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity size={14} className="text-cyan-400" />
+                <span className="text-sm text-muted-foreground">Loading live topics...</span>
+                <Loader2 size={14} className="text-cyan-400 animate-spin ml-1" />
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Topic search results */}
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
           (Array.isArray(results.topics) ? results.topics : []).map((topic: any) => (
             <GlassCard
@@ -667,7 +695,7 @@ export default function DiscoverPage() {
               </div>
             </GlassCard>
           ))}
-          {!loading && (Array.isArray(results.topics) ? results.topics : []).length === 0 && (
+          {!loading && (Array.isArray(results.topics) ? results.topics : []).length === 0 && !liveLoading && filteredLearningLive.length === 0 && (
             <GlassCard className="p-8 text-center">
               <BookOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No shared topics found</p>
