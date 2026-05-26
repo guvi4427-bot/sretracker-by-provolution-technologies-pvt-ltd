@@ -134,7 +134,19 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setUser: (data: any) => {
     try {
-      set({ profile: mapApiToProfile(data), loading: false });
+      const newProfile = mapApiToProfile(data);
+      // Merge strategy: never let follower/following counts drop due to DB replication lag
+      set((state) => {
+        if (!state.profile) return { profile: newProfile, loading: false };
+        const merged = { ...newProfile };
+        if (typeof data.followerCount === 'number' && data.followerCount < state.profile.followerCount) {
+          merged.followerCount = state.profile.followerCount;
+        }
+        if (typeof data.followingCount === 'number' && data.followingCount < state.profile.followingCount) {
+          merged.followingCount = state.profile.followingCount;
+        }
+        return { profile: merged, loading: false };
+      });
     } catch {
       set({ loading: false });
     }
@@ -150,7 +162,20 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         try {
-          set({ profile: mapApiToProfile(data), loading: false });
+          const newProfile = mapApiToProfile(data);
+          // Merge strategy: never let follower/following counts drop due to DB replication lag
+          // Use the HIGHER of server vs current local count
+          set((state) => {
+            if (!state.profile) return { profile: newProfile, loading: false };
+            const merged = { ...newProfile };
+            if (typeof data.followerCount === 'number' && data.followerCount < state.profile.followerCount) {
+              merged.followerCount = state.profile.followerCount;
+            }
+            if (typeof data.followingCount === 'number' && data.followingCount < state.profile.followingCount) {
+              merged.followingCount = state.profile.followingCount;
+            }
+            return { profile: merged, loading: false };
+          });
         } catch {
           set({ loading: false });
         }

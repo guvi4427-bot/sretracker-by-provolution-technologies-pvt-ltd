@@ -201,8 +201,10 @@ export default function MessagesPage() {
             }
           }
         }
-        // Clean up URL so refresh doesn't re-trigger
-        router.replace('/messages', { scroll: false });
+        // Clean up URL so refresh doesn't re-trigger — use replaceState to avoid navigation
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', '/messages');
+        }
       } catch {}
     })();
   }, [searchParams, profile?.userId]);
@@ -494,7 +496,7 @@ export default function MessagesPage() {
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8"><AvatarFallback className="bg-blue-600/30 text-blue-300 text-xs">{conv.otherUser?.name?.[0] || '?'}</AvatarFallback></Avatar>
                     <div className="min-w-0">
-                      <p className="text-sm text-foreground truncate">{conv.otherUser?.name || 'User'}</p>
+                      <p className="text-sm text-foreground truncate">{conv.otherUser?.name || conv.otherUser?.username || 'User'}</p>
                       <p className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">{conv.lastMessage || ''}</p>
                     </div>
                   </div>
@@ -511,7 +513,7 @@ export default function MessagesPage() {
                   <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
                     <button onClick={() => setMobileShowChat(false)} className="lg:hidden text-muted-foreground hover:text-foreground"><ArrowLeft size={18} /></button>
                     <Avatar className="h-7 w-7"><AvatarFallback className="bg-blue-600/30 text-blue-300 text-xs">{activeConvOtherUser?.name?.[0] || '?'}</AvatarFallback></Avatar>
-                    <span className="text-sm font-medium text-foreground">{activeConvOtherUser?.name || 'User'}</span>
+                    <span className="text-sm font-medium text-foreground">{activeConvOtherUser?.name || activeConvOtherUser?.username || 'User'}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-3 mb-3">
                     {messages.map((m: any, i: number) => (

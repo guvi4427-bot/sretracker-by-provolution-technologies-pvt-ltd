@@ -104,6 +104,7 @@ export default function FitnessPage() {
   const [profileForm, setProfileForm] = useState({ weight: '', height: '', age: '', gender: 'male', activityLevel: 'moderate', goal: 'maintain', unitSystem: 'metric' as 'metric' | 'imperial' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [profileReady, setProfileReady] = useState(false); // Prevents form flash before first load
 
   // Unit conversion helpers
   const isImperial = profileForm.unitSystem === 'imperial';
@@ -159,6 +160,7 @@ export default function FitnessPage() {
       }
     } catch {} finally {
       setProfileLoading(false);
+      setProfileReady(true);
     }
   }, []);
 
@@ -427,7 +429,8 @@ export default function FitnessPage() {
         }
         setWeightValue('');
         fetchWeights(); // background sync
-        fetchProfile();
+        // Await profile refresh so macros/TDEE update immediately
+        await fetchProfile();
         toast.success('Weight logged & targets updated!');
         window.dispatchEvent(new CustomEvent('xp-updated'));
         window.dispatchEvent(new CustomEvent('notification-updated'));
@@ -505,7 +508,7 @@ export default function FitnessPage() {
               )}
             </div>
 
-            {profileLoading ? (
+            {!profileReady ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
               </div>
@@ -573,7 +576,7 @@ export default function FitnessPage() {
                 </div>
 
                 {computedRequiredCal > 0 && computedMacros && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/20 rounded-xl p-4">
+                  <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/20 rounded-xl p-4">
                     <p className="text-xs text-muted-foreground text-center">Required Daily Calories for Your Goal</p>
                     <p className="text-2xl font-bold text-blue-400 mt-1 text-center">{computedRequiredCal.toLocaleString()} <span className="text-sm text-muted-foreground">cal/day</span></p>
                     <p className="text-[10px] text-muted-foreground/50 text-center mt-1">TDEE: {computedTDEE.toLocaleString()} cal · Goal adjustment: {profileForm.goal === 'lose' ? '-20%' : profileForm.goal === 'gain' ? '+15%' : '0%'}</p>
@@ -583,7 +586,7 @@ export default function FitnessPage() {
                       <div className="text-center"><p className="text-sm font-bold text-red-400">{computedMacros.fatG}g</p><p className="text-[10px] text-muted-foreground/70">Fat (27.5%)</p></div>
                       <div className="text-center"><p className="text-sm font-bold text-green-400">{computedMacros.fiberG}g</p><p className="text-[10px] text-muted-foreground/70">Fiber (14g/1k)</p></div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 <div className="flex gap-2">
@@ -1308,14 +1311,15 @@ export default function FitnessPage() {
 
           {/* Calorie Balance Chart */}
           {(() => {
+            // Deduplicate workouts by ID to prevent double-counting
+            const allWorkoutsDeduped = Array.from(
+              new Map([...workouts, ...Object.values(workoutHistory).flat()].map((w: any) => [w.id, w])).values()
+            );
             const calorieChartData = weekDates.slice().reverse().map(dateStr => {
               const logs = dateStr === today ? foodLogs : (nutritionHistory[dateStr] || []);
-              // Match workouts by date — handle both exact match and potential timezone offsets
-              const dayWorkouts = [...workouts, ...Object.values(workoutHistory).flat()].filter((w: any) => {
+              const dayWorkouts = allWorkoutsDeduped.filter((w: any) => {
                 if (!w.date) return false;
-                // Direct match
                 if (w.date === dateStr) return true;
-                // Handle timezone: date might be stored as ISO with time component
                 try { return new Date(w.date).toISOString().split('T')[0] === dateStr; } catch { return false; }
               });
               const consumed = logs.reduce((a: number, f: any) => a + (f.calories || 0), 0);

@@ -107,7 +107,7 @@ export default function ProfilePage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const r = await fetch('/api/follow?type=count');
+      const r = await fetch('/api/follow?type=count&_t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) {
         const d = await r.json();
         // Only update if server returns valid numbers; never overwrite with 0

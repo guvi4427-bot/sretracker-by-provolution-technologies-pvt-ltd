@@ -92,19 +92,20 @@ export async function PATCH(request: Request) {
     const isSuperAdmin = adminCheck.data.isSuperAdmin;
     const isTargetSuperAdmin = user.adminRole?.isSuperAdmin || user.email === SUPER_ADMIN_EMAIL;
 
-    // Only super admin can modify other super admins
+    // Admins can perform all actions EXCEPT on super admins:
+    // Only super admin can modify other super admins (ban, suspend, delete, verify, change access)
     if (isTargetSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Cannot modify a super admin' }, { status: 403 });
+      return NextResponse.json({ error: 'Only super admin can modify or delete a super admin' }, { status: 403 });
+    }
+
+    // Super admin exclusive actions: promoting to super admin and demoting super admin
+    if (['promote_super_admin', 'demote_super_admin'].includes(action) && !isSuperAdmin) {
+      return NextResponse.json({ error: 'Only super admin can modify super admin access' }, { status: 403 });
     }
 
     const validActions = ['suspend', 'ban', 'activate', 'verify', 'unverify', 'promote_admin', 'promote_super_admin', 'demote_admin', 'demote_super_admin'];
     if (!validActions.includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-    }
-
-    // Super admin only actions: promoting to super admin and demoting super admin
-    if (['promote_super_admin', 'demote_super_admin'].includes(action) && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Super admin access required' }, { status: 403 });
     }
 
     const statusMap: Record<string, string> = { suspend: 'suspended', ban: 'banned', activate: 'active' };
