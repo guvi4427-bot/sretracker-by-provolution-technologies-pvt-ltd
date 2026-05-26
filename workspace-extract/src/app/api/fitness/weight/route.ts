@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserId } from '@/lib/auth-helper';
 
+const ACTIVITY_MULTIPLIERS: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+const GOAL_MULTIPLIERS: Record<string, number> = { lose: 0.8, maintain: 1.0, gain: 1.15 };
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -82,12 +85,30 @@ export async function POST(request: Request) {
       });
     }
 
-    // Also update fitness profile weight
+    // Also update fitness profile weight AND recalculate TDEE/targets
     const fitnessProfile = await db.fitnessProfile.findUnique({ where: { userId } });
     if (fitnessProfile) {
+      const w = parseFloat(weight);
+      const h = fitnessProfile.height;
+      const a = fitnessProfile.age;
+      const g = fitnessProfile.gender;
+      const al = fitnessProfile.activityLevel;
+      const gl = fitnessProfile.goal;
+      let tdee = fitnessProfile.tdee;
+      let calorieTarget = fitnessProfile.calorieTarget;
+      let proteinTarget = fitnessProfile.proteinTarget;
+      // Recalculate TDEE and targets with the new weight
+      if (w && h && a && g && al && gl) {
+        let bmr: number;
+        if (g === 'male') { bmr = 10 * w + 6.25 * h - 5 * a + 5; }
+        else { bmr = 10 * w + 6.25 * h - 5 * a - 161; }
+        tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[al] || 1.375));
+        calorieTarget = Math.round(tdee * (GOAL_MULTIPLIERS[gl] || 1.0));
+        proteinTarget = Math.round(w * 2);
+      }
       await db.fitnessProfile.update({
         where: { userId },
-        data: { weight: parseFloat(weight) },
+        data: { weight: w, tdee, calorieTarget, proteinTarget },
       });
     }
 

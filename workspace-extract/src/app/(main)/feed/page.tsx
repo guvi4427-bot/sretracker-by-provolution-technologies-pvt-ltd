@@ -278,6 +278,14 @@ export default function FeedPage() {
                 </span>
               ))}
             </div>
+
+            {/* Action bar for live updates */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (!update.postId) return; toggleLike(update.postId, update.isLiked || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (!update.postId) { router.push(`/profile/${update.user?.id}`); return; } setCommentPostId(update.postId); loadComments(update.postId); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (!update.postId) return; toggleRepost(update.postId, update.isReposted || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Live Update`, text: update.title || 'Check out this live update!', url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+            </div>
           </div>
         </div>
       </GlassCard>
@@ -424,6 +432,14 @@ export default function FeedPage() {
                 </span>
               ))}
             </div>
+
+            {/* Action bar for live updates */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (!update.postId) return; toggleLike(update.postId, update.isLiked || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (!update.postId) { router.push(`/profile/${update.user?.id}`); return; } setCommentPostId(update.postId); loadComments(update.postId); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (!update.postId) return; toggleRepost(update.postId, update.isReposted || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Fitness Update`, text: `${update.workoutType || 'Workout'} - ${update.duration || ''}min`, url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+            </div>
           </div>
         </div>
       </GlassCard>
@@ -503,6 +519,14 @@ export default function FeedPage() {
                   #{tag}
                 </span>
               ))}
+            </div>
+
+            {/* Action bar for live updates */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (!update.postId) return; toggleLike(update.postId, update.isLiked || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (!update.postId) { router.push(`/shared-topic/${update.id}?from=feed`); return; } setCommentPostId(update.postId); loadComments(update.postId); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (!update.postId) return; toggleRepost(update.postId, update.isReposted || false); }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Learning Topic`, text: update.name || 'Check out this learning topic!', url: `${window.location.origin}/shared-topic/${update.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/shared-topic/${update.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>

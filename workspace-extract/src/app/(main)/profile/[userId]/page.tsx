@@ -107,23 +107,24 @@ export default function PublicProfilePage() {
       if (r.ok) {
         const data = await r.json();
         setUserData((prev: any) => {
-          const serverFollowers = typeof data.followersCount === 'number' ? data.followersCount : 0;
-          const serverFollowing = typeof data.followingCount === 'number' ? data.followingCount : 0;
+          const serverFollowers = typeof data.followersCount === 'number' ? data.followersCount : undefined;
+          const serverFollowing = typeof data.followingCount === 'number' ? data.followingCount : undefined;
           if (!prev) {
             // First load — use server data directly
             return {
               ...data,
-              followersCount: serverFollowers,
-              followingCount: serverFollowing,
+              followersCount: serverFollowers ?? 0,
+              followingCount: serverFollowing ?? 0,
             };
           }
-          // Merge: trust server data for counts (authoritative), but never let them go negative
-          // If server returns 0 but we had a positive count, use server (could be a real unfollow)
+          // Merge: use server data when available; if server returns undefined or 0 but we
+          // had a positive count from a recent follow action, keep the optimistic value to
+          // avoid the count disappearing during database replication delays.
           return {
             ...prev,
             ...data,
-            followersCount: Math.max(0, serverFollowers),
-            followingCount: Math.max(0, serverFollowing),
+            followersCount: serverFollowers !== undefined ? Math.max(0, serverFollowers) : prev.followersCount ?? 0,
+            followingCount: serverFollowing !== undefined ? Math.max(0, serverFollowing) : prev.followingCount ?? 0,
           };
         });
       }

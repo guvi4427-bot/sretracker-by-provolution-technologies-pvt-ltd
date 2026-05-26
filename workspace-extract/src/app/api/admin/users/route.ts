@@ -102,8 +102,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    // Super admin only actions
-    if (['promote_super_admin', 'demote_admin', 'demote_super_admin'].includes(action) && !isSuperAdmin) {
+    // Super admin only actions: promoting to super admin and demoting super admin
+    if (['promote_super_admin', 'demote_super_admin'].includes(action) && !isSuperAdmin) {
       return NextResponse.json({ error: 'Super admin access required' }, { status: 403 });
     }
 
@@ -166,9 +166,8 @@ export async function DELETE(request: Request) {
     const adminCheck = await requireAdmin();
     if ('error' in adminCheck) return NextResponse.json({ error: adminCheck.error!.message }, { status: adminCheck.error!.status });
 
-    if (!adminCheck.data.isSuperAdmin) {
-      return NextResponse.json({ error: 'Super admin access required to delete users' }, { status: 403 });
-    }
+    // Admins can delete users, but not super admins (checked below)
+    // No super-admin-only gate here — any admin can delete non-super-admin users
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');

@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ── Topic Share Message Card ──
 function TopicShareCard({ content, router }: { content: string; router: ReturnType<typeof useRouter> }) {
@@ -85,6 +85,7 @@ function renderMessageContent(content: string, router: ReturnType<typeof useRout
 export default function MessagesPage() {
   const { profile } = useUserStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('dm');
   const [conversations, setConversations] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
@@ -159,6 +160,49 @@ export default function MessagesPage() {
   }
 
   useEffect(() => { fetchConversations(); fetchGroups(); setLoading(false); }, [fetchConversations, fetchGroups]);
+
+  // Auto-start DM when navigated from friends tab with ?userId=xxx
+  useEffect(() => {
+    const targetUserId = searchParams.get('userId');
+    if (!targetUserId || !profile?.userId) return;
+    // Only run once — remove the param after reading it
+    const timer = setTimeout(async () => {
+      try {
+        // Check if conversation already exists
+        const convs = await (await fetch('/api/messages')).json();
+        const allConvs = Array.isArray(convs) ? convs : convs.conversations || [];
+        const existing = allConvs.find((c: any) => c.otherUser?.id === targetUserId);
+        if (existing) {
+          openConversation(existing.id, existing.otherUser);
+        } else {
+          // Fetch target user's name first
+          const userRes = await fetch(`/api/user/public/${targetUserId}`);
+          let otherUser = { id: targetUserId, name: 'User', username: '' };
+          if (userRes.ok) {
+            const ud = await userRes.json();
+            otherUser = { id: targetUserId, name: ud.profile?.name || ud.username || 'User', username: ud.username || '' };
+          }
+          // Create conversation with a greeting
+          const r = await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiverId: targetUserId, content: 'Hi!' }),
+          });
+          if (r.ok) {
+            const data = await r.json();
+            await fetchConversations();
+            if (data.conversationId) {
+              openConversation(data.conversationId, otherUser);
+            }
+          }
+        }
+        // Clean up URL so refresh doesn't re-trigger
+        router.replace('/messages', { scroll: false });
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, profile?.userId]);
 
   // Refetch conversations periodically for DM persistence
   useEffect(() => {
@@ -278,6 +322,13 @@ export default function MessagesPage() {
 
   async function startDM(userId: string) {
     try {
+      // Fetch target user's profile for display name
+      const userRes = await fetch(`/api/user/public/${userId}`);
+      let otherUser: any = { id: userId, name: 'User', username: '' };
+      if (userRes.ok) {
+        const ud = await userRes.json();
+        otherUser = { id: userId, name: ud.profile?.name || ud.username || 'User', username: ud.username || '' };
+      }
       const r = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -288,11 +339,9 @@ export default function MessagesPage() {
         await fetchConversations();
         setSearchQuery('');
         setSearchResults([]);
-        // Open the new conversation
+        // Open the new conversation with the fetched user info
         if (data.conversationId) {
-          // Find the other user's profile for display
-          const conv = conversations.find((c: any) => c.id === data.conversationId);
-          openConversation(data.conversationId, conv?.otherUser);
+          openConversation(data.conversationId, otherUser);
         }
       }
     } catch {}

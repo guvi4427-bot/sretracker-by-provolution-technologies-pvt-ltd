@@ -103,6 +103,7 @@ export default function FitnessPage() {
   const [editProfile, setEditProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ weight: '', height: '', age: '', gender: 'male', activityLevel: 'moderate', goal: 'maintain', unitSystem: 'metric' as 'metric' | 'imperial' });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   // Unit conversion helpers
   const isImperial = profileForm.unitSystem === 'imperial';
@@ -141,20 +142,24 @@ export default function FitnessPage() {
         const fp = d.profile || d;
         if (fp && fp !== null && (fp.weight || fp.height || fp.age || fp.gender || fp.tdee)) {
           setFitnessProfile(fp);
+          const fpUnitSystem = (fp.unitSystem as 'metric' | 'imperial') || 'metric';
+          const fpIsImperial = fpUnitSystem === 'imperial';
           setProfileForm({
-            weight: fp.weight != null ? (isImperial ? kgToLbs(fp.weight).toString() : fp.weight.toString()) : '',
-            height: fp.height != null ? (isImperial ? cmToIn(fp.height).toString() : fp.height.toString()) : '',
+            weight: fp.weight != null ? (fpIsImperial ? kgToLbs(fp.weight).toString() : fp.weight.toString()) : '',
+            height: fp.height != null ? (fpIsImperial ? cmToIn(fp.height).toString() : fp.height.toString()) : '',
             age: fp.age?.toString() || '',
             gender: fp.gender || 'male',
             activityLevel: fp.activityLevel || 'moderate',
             goal: fp.goal || 'maintain',
-            unitSystem: (fp.unitSystem as 'metric' | 'imperial') || 'metric',
+            unitSystem: fpUnitSystem,
           });
         } else {
           setFitnessProfile(null);
         }
       }
-    } catch {}
+    } catch {} finally {
+      setProfileLoading(false);
+    }
   }, []);
 
   const fetchFoodLogs = useCallback(async () => {
@@ -204,42 +209,35 @@ export default function FitnessPage() {
 
   useEffect(() => {
     fetchProfile(); fetchFoodLogs(); fetchWorkouts(); fetchWeights();
-    // Load past 7 days of nutrition history
+    // Load past 7 days of nutrition + workout history in parallel (batched)
     const last7 = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (i + 1));
       return d.toISOString().split('T')[0];
     });
     Promise.all(last7.map(async dateStr => {
       try {
-        const r = await fetch(`/api/fitness/food?date=${dateStr}`);
-        if (r.ok) {
-          const d = await r.json();
-          return { dateStr, logs: Array.isArray(d) ? d : d.foodLogs || [] };
-        }
+        const [foodRes, workoutRes] = await Promise.all([
+          fetch(`/api/fitness/food?date=${dateStr}`),
+          fetch(`/api/fitness/workout?date=${dateStr}`),
+        ]);
+        let fLogs: any[] = [];
+        let wLogs: any[] = [];
+        if (foodRes.ok) { const d = await foodRes.json(); fLogs = Array.isArray(d) ? d : d.foodLogs || []; }
+        if (workoutRes.ok) { const d = await workoutRes.json(); wLogs = Array.isArray(d) ? d : d.workouts || []; }
+        return { dateStr, foodLogs: fLogs, workoutLogs: wLogs };
       } catch {}
-      return { dateStr, logs: [] as any[] };
+      return { dateStr, foodLogs: [] as any[], workoutLogs: [] as any[] };
     })).then(results => {
-      const map: Record<string, any[]> = {};
-      results.forEach(r => { map[r.dateStr] = r.logs; });
-      setNutritionHistory(prev => ({ ...prev, ...map }));
+      const foodMap: Record<string, any[]> = {};
+      const workoutMap: Record<string, any[]> = {};
+      results.forEach(r => {
+        foodMap[r.dateStr] = r.foodLogs;
+        workoutMap[r.dateStr] = r.workoutLogs;
+      });
+      setNutritionHistory(prev => ({ ...prev, ...foodMap }));
+      setWorkoutHistory(prev => ({ ...prev, ...workoutMap }));
     });
-    // Load past 7 days of workout history
-    const last7w = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (i + 1));
-      return d.toISOString().split('T')[0];
-    });
-    Promise.all(last7w.map(async dateStr => {
-      try {
-        const r = await fetch(`/api/fitness/workout?date=${dateStr}`);
-        if (r.ok) { const d = await r.json(); return { dateStr, logs: Array.isArray(d) ? d : d.workouts || [] }; }
-      } catch {}
-      return { dateStr, logs: [] as any[] };
-    })).then(results => {
-      const map: Record<string, any[]> = {};
-      results.forEach(r => { map[r.dateStr] = r.logs; });
-      setWorkoutHistory(prev => ({ ...prev, ...map }));
-    });
-  }, [fetchProfile, fetchFoodLogs, fetchWorkouts, fetchWeights, fetchWorkoutForDate, fetchNutritionForDate]);
+  }, [fetchProfile, fetchFoodLogs, fetchWorkouts, fetchWeights]);
 
   const totalMacros = foodLogs.reduce((acc: any, f: any) => ({
     calories: acc.calories + (f.calories || 0),
@@ -507,7 +505,11 @@ export default function FitnessPage() {
               )}
             </div>
 
-            {(!fitnessProfile || editProfile) ? (
+            {profileLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              </div>
+            ) : (!fitnessProfile || editProfile) ? (
               <div className="space-y-4">
                 {/* Unit System Toggle */}
                 <div className="flex items-center gap-2">
@@ -1308,12 +1310,30 @@ export default function FitnessPage() {
           {(() => {
             const calorieChartData = weekDates.slice().reverse().map(dateStr => {
               const logs = dateStr === today ? foodLogs : (nutritionHistory[dateStr] || []);
-              const dayWorkouts = [...workouts, ...Object.values(workoutHistory).flat()].filter((w: any) => w.date === dateStr);
+              // Match workouts by date — handle both exact match and potential timezone offsets
+              const dayWorkouts = [...workouts, ...Object.values(workoutHistory).flat()].filter((w: any) => {
+                if (!w.date) return false;
+                // Direct match
+                if (w.date === dateStr) return true;
+                // Handle timezone: date might be stored as ISO with time component
+                try { return new Date(w.date).toISOString().split('T')[0] === dateStr; } catch { return false; }
+              });
               const consumed = logs.reduce((a: number, f: any) => a + (f.calories || 0), 0);
               const burned = dayWorkouts.reduce((a: number, w: any) => a + (w.estimatedCalories || 0), 0);
               return { date: dateStr.slice(5), consumed, burned };
             });
-            if (calorieChartData.every(d => d.consumed === 0 && d.burned === 0)) return null;
+            const hasAnyData = calorieChartData.some(d => d.consumed > 0 || d.burned > 0);
+            if (!hasAnyData) {
+              return (
+                <GlassCard variant="glowing" className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Flame size={16} className="text-amber-400" />
+                    <h3 className="text-sm font-medium text-muted-foreground">Calorie Balance (7 Days)</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground/50 text-center py-6">Log food or workouts to see your calorie balance trend</p>
+                </GlassCard>
+              );
+            }
             return (
               <GlassCard variant="glowing" className="p-4">
                 <div className="flex items-center gap-2 mb-3">

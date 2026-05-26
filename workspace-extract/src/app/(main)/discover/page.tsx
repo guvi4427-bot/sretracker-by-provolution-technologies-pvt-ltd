@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check } from 'lucide-react';
+import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check, Heart, MessageCircle, Repeat2, Share2 } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { AdCard } from '@/components/ad-banner';
 import { Input } from '@/components/ui/input';
@@ -281,6 +281,13 @@ export default function DiscoverPage() {
                 <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-purple-600/15 text-purple-300 cursor-pointer hover:bg-purple-600/25 transition-colors">#{tag}</span>
               ))}
             </div>
+            {/* Action bar */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/like`, { method: 'POST' }); toast.success('Liked!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-rose-400 transition-colors"><Heart size={13} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} /></button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/repost`, { method: 'POST' }); toast.success('Reposted!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-green-400 transition-colors"><Repeat2 size={13} /></button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Content Update`, text: update.title || 'Check out this content update!', url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+            </div>
           </div>
         </div>
       </GlassCard>
@@ -415,6 +422,13 @@ export default function DiscoverPage() {
                 <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-colors ${isGaining ? 'bg-green-600/15 text-green-300' : 'bg-orange-600/15 text-orange-300'}`}>#{tag}</span>
               ))}
             </div>
+            {/* Action bar */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/like`, { method: 'POST' }); toast.success('Liked!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-rose-400 transition-colors"><Heart size={13} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} /></button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/repost`, { method: 'POST' }); toast.success('Reposted!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-green-400 transition-colors"><Repeat2 size={13} /></button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Fitness Update`, text: `${update.workoutType || 'Workout'} - ${update.duration || ''}min`, url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+            </div>
           </div>
         </div>
       </GlassCard>
@@ -487,6 +501,13 @@ export default function DiscoverPage() {
               {update.hashtags?.map((tag: string) => (
                 <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 cursor-pointer hover:bg-cyan-600/25 transition-colors">#{tag}</span>
               ))}
+            </div>
+            {/* Action bar */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
+              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/like`, { method: 'POST' }); toast.success('Liked!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-rose-400 transition-colors"><Heart size={13} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(`/shared-topic/${update.id}?from=discover`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} /></button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { fetch(`/api/posts/${update.postId}/repost`, { method: 'POST' }); toast.success('Reposted!'); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-green-400 transition-colors"><Repeat2 size={13} /></button>
+              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Learning Topic`, text: update.name || 'Check out this learning topic!', url: `${window.location.origin}/shared-topic/${update.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/shared-topic/${update.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
