@@ -153,3 +153,29 @@ Stage Summary:
 - Search "cybersecurity" in Posts tab → shows posts with #cybersecurity hashtag + live content/fitness updates matching the keyword
 - API now searches both post.content and post.hashtags columns for posts type
 - No changes to groups/users API routes or rendering — untouched
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix duplicate text-only versions of rich cards and deduplicate learning live updates
+
+Work Log:
+- Diagnosed two duplicate issues:
+  1. Discover Topics tab: same learning topic appeared as BOTH a rich DiscoverLearningCard AND a plain topic search result (text-only duplicate at bottom)
+  2. Feed page: no deduplication — same topic from same user could appear multiple times
+- Discover page fixes:
+  - Added deduplication for all live update types (learning, content, fitness) using Set of `${id}_${userId}` keys
+  - Created `liveTopicIds` Set from deduplicated learning live cards
+  - Filtered topic search results to exclude items whose ID is in liveTopicIds (removes text-only duplicates)
+  - Updated empty-state conditions to account for filtered topic results
+- Feed page fixes:
+  - Added deduplication step in `mergedFeedItems` useMemo after collecting all items
+  - Uses Set of `${item.type}-${item.data?.id}_${item.data?.user?.id}` keys
+  - Replaced `items` with `dedupedItems` for sort and hashtag grouping
+- Deployed to both pid1 (sretracker.vercel.app) and pid2 (sretrack.vercel.app)
+
+Stage Summary:
+- No more text-only duplicate of rich cards in Topics tab
+- No more same topic from same user appearing multiple times in feed
+- Live updates (learning, content, fitness) all deduplicated by (entity ID + user ID)
+- Rich cards remain as the single source of truth for each live update

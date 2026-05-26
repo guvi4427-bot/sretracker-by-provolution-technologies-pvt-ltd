@@ -518,6 +518,38 @@ export default function DiscoverPage() {
   const filteredContentLive = contentLive.filter(liveMatchesSearch);
   const filteredFitnessLive = fitnessLive.filter(liveMatchesSearch);
 
+  // Deduplicate: same topic from same user should appear only once
+  const deduplicatedLearningLive = (() => {
+    const seen = new Set<string>();
+    return filteredLearningLive.filter((u: any) => {
+      const key = `${u.id}_${u.user?.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+  const deduplicatedContentLive = (() => {
+    const seen = new Set<string>();
+    return filteredContentLive.filter((u: any) => {
+      const key = `${u.id}_${u.user?.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+  const deduplicatedFitnessLive = (() => {
+    const seen = new Set<string>();
+    return filteredFitnessLive.filter((u: any) => {
+      const key = `${u.id}_${u.user?.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  // Set of live topic IDs to exclude from regular topic search results (prevent duplicate text-only version)
+  const liveTopicIds = new Set<string>(deduplicatedLearningLive.map((u: any) => u.id));
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Semantic heading for SEO/crawlers — visually hidden */}
@@ -542,20 +574,20 @@ export default function DiscoverPage() {
 
         <TabsContent value="posts" className="space-y-3 mt-4">
           {/* ═══ LIVE UPDATES in Posts tab: learning + content + fitness rich cards ═══ */}
-          {!liveLoading && (filteredLearningLive.length > 0 || filteredContentLive.length > 0 || filteredFitnessLive.length > 0) && (
+          {!liveLoading && (deduplicatedLearningLive.length > 0 || deduplicatedContentLive.length > 0 || deduplicatedFitnessLive.length > 0) && (
             <div className="space-y-3">
               {/* Learning Live Topic Updates */}
-              {filteredLearningLive.length > 0 && (
+              {deduplicatedLearningLive.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <BookOpen size={14} className="text-cyan-400" />
                     <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
                     <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredLearningLive.length} update{filteredLearningLive.length !== 1 ? 's' : ''}</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{deduplicatedLearningLive.length} update{deduplicatedLearningLive.length !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="space-y-3">
-                    {filteredLearningLive.map((u: any) => (
+                    {deduplicatedLearningLive.map((u: any) => (
                       <DiscoverLearningCard key={u.id} update={u} />
                     ))}
                   </div>
@@ -563,17 +595,17 @@ export default function DiscoverPage() {
               )}
 
               {/* Content Live Updates */}
-              {filteredContentLive.length > 0 && (
+              {deduplicatedContentLive.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Video size={14} className="text-purple-400" />
                     <h3 className="text-sm font-medium text-purple-400">#content</h3>
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
                     <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredContentLive.length} update{filteredContentLive.length !== 1 ? 's' : ''}</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{deduplicatedContentLive.length} update{deduplicatedContentLive.length !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="space-y-3">
-                    {filteredContentLive.map((u: any) => (
+                    {deduplicatedContentLive.map((u: any) => (
                       <DiscoverContentCard key={u.id} update={u} />
                     ))}
                   </div>
@@ -581,17 +613,17 @@ export default function DiscoverPage() {
               )}
 
               {/* Fitness Live Updates */}
-              {filteredFitnessLive.length > 0 && (
+              {deduplicatedFitnessLive.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Dumbbell size={14} className="text-green-400" />
                     <h3 className="text-sm font-medium text-green-400">#fitness</h3>
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
                     <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                    <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredFitnessLive.length} update{filteredFitnessLive.length !== 1 ? 's' : ''}</span>
+                    <span className="text-[9px] text-muted-foreground/50 ml-1">{deduplicatedFitnessLive.length} update{deduplicatedFitnessLive.length !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="space-y-3">
-                    {filteredFitnessLive.map((u: any) => (
+                    {deduplicatedFitnessLive.map((u: any) => (
                       <DiscoverFitnessCard key={u.id} update={u} />
                     ))}
                   </div>
@@ -613,7 +645,7 @@ export default function DiscoverPage() {
 
           {/* Text posts from feed — raw/simple style */}
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
-          (Array.isArray(results.posts) ? results.posts : []).length === 0 && !liveLoading && filteredLearningLive.length === 0 && filteredContentLive.length === 0 && filteredFitnessLive.length === 0 ? (
+          (Array.isArray(results.posts) ? results.posts : []).length === 0 && !liveLoading && deduplicatedLearningLive.length === 0 && deduplicatedContentLive.length === 0 && deduplicatedFitnessLive.length === 0 ? (
             <GlassCard className="p-8 text-center">
               <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No posts found</p>
@@ -633,17 +665,17 @@ export default function DiscoverPage() {
 
         <TabsContent value="topics" className="space-y-3 mt-4">
           {/* ═══ LIVE UPDATES in Topics tab: learning live cards ═══ */}
-          {!liveLoading && filteredLearningLive.length > 0 && (
+          {!liveLoading && deduplicatedLearningLive.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <BookOpen size={14} className="text-cyan-400" />
                 <h3 className="text-sm font-medium text-cyan-400">#learning</h3>
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
                 <span className="text-[9px] text-green-400/70 font-medium ml-0.5">LIVE</span>
-                <span className="text-[9px] text-muted-foreground/50 ml-1">{filteredLearningLive.length} update{filteredLearningLive.length !== 1 ? 's' : ''}</span>
+                <span className="text-[9px] text-muted-foreground/50 ml-1">{deduplicatedLearningLive.length} update{deduplicatedLearningLive.length !== 1 ? 's' : ''}</span>
               </div>
               <div className="space-y-3">
-                {filteredLearningLive.map((u: any) => (
+                {deduplicatedLearningLive.map((u: any) => (
                   <DiscoverLearningCard key={u.id} update={u} />
                 ))}
               </div>
@@ -661,9 +693,9 @@ export default function DiscoverPage() {
             </GlassCard>
           )}
 
-          {/* Topic search results */}
+          {/* Topic search results — exclude topics already shown as rich live cards */}
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
-          (Array.isArray(results.topics) ? results.topics : []).map((topic: any) => (
+          (Array.isArray(results.topics) ? results.topics : []).filter((topic: any) => !liveTopicIds.has(topic.id)).map((topic: any) => (
             <GlassCard
               key={topic.id}
               className="p-4 cursor-pointer hover:border-blue-500/20 transition-colors group"
@@ -713,7 +745,7 @@ export default function DiscoverPage() {
               </div>
             </GlassCard>
           ))}
-          {!loading && (Array.isArray(results.topics) ? results.topics : []).length === 0 && !liveLoading && filteredLearningLive.length === 0 && (
+          {!loading && (Array.isArray(results.topics) ? results.topics : []).filter((t: any) => !liveTopicIds.has(t.id)).length === 0 && !liveLoading && deduplicatedLearningLive.length === 0 && (
             <GlassCard className="p-8 text-center">
               <BookOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No shared topics found</p>

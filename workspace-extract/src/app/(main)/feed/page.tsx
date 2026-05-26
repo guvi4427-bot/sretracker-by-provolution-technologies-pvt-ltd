@@ -582,15 +582,26 @@ export default function FeedPage() {
       });
     });
 
+    // ── Deduplicate: same entity from same user should appear only once ──
+    const seenKeys = new Set<string>();
+    const dedupedItems = items.filter(item => {
+      // Create a unique key per (entity id + user id) for live updates
+      // Regular posts use their own id
+      const dedupKey = item.type === 'post' ? item.id : `${item.type}-${item.data?.id}_${item.data?.user?.id}`;
+      if (seenKeys.has(dedupKey)) return false;
+      seenKeys.add(dedupKey);
+      return true;
+    });
+
     // Sort by time descending
-    items.sort((a, b) => b.sortTime - a.sortTime);
+    dedupedItems.sort((a, b) => b.sortTime - a.sortTime);
 
     // ── Hashtag grouping ──
     // Always force-group these special tags
     const FORCE_GROUP_TAGS = ['content', 'progress', 'fitness', 'gains', 'shredding', 'learning', 'study'];
 
     const tagCount: Record<string, number> = {};
-    items.forEach(item => {
+    dedupedItems.forEach(item => {
       item.hashtags.forEach(tg => { tagCount[tg] = (tagCount[tg] || 0) + 1; });
     });
 
@@ -602,7 +613,7 @@ export default function FeedPage() {
     const grouped: Record<string, FeedItem[]> = {};
     const ungrouped: FeedItem[] = [];
 
-    items.forEach(item => {
+    dedupedItems.forEach(item => {
       // Find the first matching trending/force tag
       const matched = item.hashtags.find(tg => trending.includes(tg));
       if (matched) {
