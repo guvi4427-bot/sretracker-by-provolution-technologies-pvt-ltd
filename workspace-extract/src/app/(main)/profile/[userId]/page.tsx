@@ -104,16 +104,22 @@ export default function PublicProfilePage() {
       if (r.ok) {
         const data = await r.json();
         setUserData((prev: any) => {
-          const prevFollowers = prev?.followersCount;
-          const prevFollowing = prev?.followingCount;
-          const newFollowers = typeof data.followersCount === 'number' ? data.followersCount : prevFollowers ?? 0;
-          const newFollowing = typeof data.followingCount === 'number' ? data.followingCount : prevFollowing ?? 0;
+          if (!prev) {
+            // First load — use server data directly
+            return {
+              ...data,
+              followersCount: typeof data.followersCount === 'number' ? data.followersCount : 0,
+              followingCount: typeof data.followingCount === 'number' ? data.followingCount : 0,
+            };
+          }
+          // Merge: always preserve the HIGHER count (optimistic update vs server)
+          const serverFollowers = typeof data.followersCount === 'number' ? data.followersCount : prev.followersCount ?? 0;
+          const serverFollowing = typeof data.followingCount === 'number' ? data.followingCount : prev.followingCount ?? 0;
           return {
             ...prev,
             ...data,
-            // Always preserve counts — use the higher of optimistic vs server value
-            followersCount: Math.max(newFollowers, prevFollowers ?? 0),
-            followingCount: Math.max(newFollowing, prevFollowing ?? 0),
+            followersCount: Math.max(serverFollowers, prev.followersCount ?? 0),
+            followingCount: Math.max(serverFollowing, prev.followingCount ?? 0),
           };
         });
       }
@@ -151,17 +157,31 @@ export default function PublicProfilePage() {
     fetchSharedData();
   }, [userData, userId]);
 
-  // Check follow status
+  // Check follow status (accepted or pending)
   useEffect(() => {
     if (!userId || !myProfile) return;
     async function check() {
       try {
-        const r = await fetch(`/api/follow?type=following`);
-        if (r.ok) {
-          const data = await r.json();
+        // Check if we're already following (accepted)
+        const fR = await fetch(`/api/follow?type=following`);
+        if (fR.ok) {
+          const data = await fR.json();
           const followingList = Array.isArray(data) ? data : data.following || [];
           const isFollowing = followingList.some((f: any) => f.id === userId);
-          if (isFollowing) setFollowStatus('accepted');
+          if (isFollowing) {
+            setFollowStatus('accepted');
+            return;
+          }
+        }
+        // Check if we have a pending request
+        const sR = await fetch(`/api/follow?type=sent-requests`);
+        if (sR.ok) {
+          const sData = await sR.json();
+          const sentList = Array.isArray(sData) ? sData : [];
+          const hasPending = sentList.some((r: any) => r.followingId === userId);
+          if (hasPending) {
+            setFollowStatus('pending');
+          }
         }
       } catch {}
     }
@@ -179,28 +199,42 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        // Use server-returned authoritative counts instead of optimistic math
-        if (typeof data.targetFollowersCount === 'number') {
-          setUserData((prev: any) => prev ? { ...prev, followersCount: data.targetFollowersCount } : prev);
-        }
+        // Update target user's followers count from server
+        setUserData((prev: any) => {
+          if (!prev) return prev;
+          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount;
+          return { ...prev, followersCount: newFollowers };
+        });
       } else if (data.status === 'pending') {
         setFollowStatus('pending');
         toast.success('Follow request sent');
       } else if (data.status === 'unfollowed') {
         setFollowStatus('none');
         toast.success('Unfollowed');
-        // Use server-returned authoritative counts
-        if (typeof data.targetFollowersCount === 'number') {
-          setUserData((prev: any) => prev ? { ...prev, followersCount: data.targetFollowersCount } : prev);
-        }
+        // Update target user's followers count from server
+        setUserData((prev: any) => {
+          if (!prev) return prev;
+          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount;
+          return { ...prev, followersCount: newFollowers };
+        });
       } else if (data.status === 'withdrawn') {
         setFollowStatus('none');
         toast.success('Request withdrawn');
       }
+      // Update user store so own profile page reflects the new following count
+      if (typeof data.myFollowingCount === 'number') {
+        try {
+          const profileRes = await fetch('/api/user/profile');
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            useUserStore.getState().setUser(profileData);
+          }
+        } catch {}
+      }
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
       // Delayed server refresh to get full authoritative data
-      setTimeout(() => { loadUser(); }, 1000);
+      setTimeout(() => { loadUser(); }, 1500);
     } catch {}
   }
 

@@ -1,47 +1,68 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Fix all reported bugs and add new features
+Task: Fix followers/following count vanishing after following someone
 
 Work Log:
-- Fixed follower/following count vanishing after following by using Math.max merge in loadUser and delaying server refresh to 1000ms
-- Fixed profile editing space crash by removing useCallback wrappers that caused stale closures, replaced with simple functions
-- Added shareLearningProgress field to Prisma Profile model, user store, profile API, and public profile API
-- Added Share Learning Progress toggle in profile settings
-- Rewrote /api/feed/live-updates to filter by share settings (shareFitnessProgress, shareContentStatus, shareLearningProgress) and respect private profile visibility (only followers can see)
-- Rewrote /api/discover to also filter by share settings and private profile visibility
-- Fixed home page achievement count showing 0 by adding cache-busting (_t=Date.now()) and no-store header to fetch
-- Fixed discover search by using refs for query/tab instead of useCallback deps, preventing infinite re-render loop and only resetting current tab results
+- Read and analyzed `/api/follow/route.ts`, `profile/[userId]/page.tsx`, `profile/page.tsx`
+- Identified that after follow/unfollow, only `followersCount` was updated on the public profile page, not preserving `followingCount`
+- The `loadUser()` merge logic could lose counts due to stale Neon read replicas
+- The `checkFollowStatus` effect didn't check for pending follow requests
+- After following, the user store wasn't updated with the new following count
+
+Changes Made:
+1. `src/app/(main)/profile/[userId]/page.tsx`:
+   - Improved `loadUser()` merge logic: explicit first-load path + always preserve higher count via Math.max
+   - Enhanced `handleFollow()`: better count preservation, updates user store after follow/unfollow so own profile shows correct following count
+   - Fixed `checkFollowStatus` useEffect: now checks both accepted AND pending follow requests
+   - Increased delayed refresh from 1000ms to 1500ms to allow Neon replication
 
 Stage Summary:
-- 11 files changed with 297 insertions, 241 deletions
-- All bugs fixed, new features implemented
-- Prisma schema pushed to database (shareLearningProgress column added)
-- Build succeeded
-- Deployment requires manual git push (no credentials in environment)
+- Followers/following counts now properly preserved after follow/unfollow actions
+- User store updated in background after follow actions
+- Pending follow request status now correctly detected
 ---
-Task ID: 1
+Task ID: 2
 Agent: Main Agent
-Task: Fix followers/following count vanishing + sharing toggles + private account visibility
+Task: Fix sharing toggle privacy logic + private account visibility in feed
 
 Work Log:
-- Read and analyzed 10+ source files to understand the follow system, sharing toggles, and privacy system
-- Identified root causes for both bugs
-- Fixed follow API to return authoritative counts after follow/unfollow
-- Fixed public profile page to use server-returned counts instead of optimistic math
-- Fixed Discover page follow handler to dispatch events and update UI state
-- Fixed own profile page to listen for visibilitychange events for count refresh
-- Added shareFitnessProgress and shareContentStatus to public profile API response
-- Added server-side access control to fitness/workout, fitness/weight, content/entries, and content/series APIs
-- Added sharing-updated event dispatching when toggles change on profile page
-- Added sharing-updated event listener on feed and discover pages to refresh live updates
-- Updated toggle descriptions to clearly communicate current state effects
-- TypeScript compilation passes with zero errors
+- Read and analyzed live-updates API, profile toggle functions, feed/discover pages
+- Backend `isVisible()` logic was already correct for share settings + private account visibility
+- Identified root cause: after toggle change, `sharing-updated` event was dispatched immediately, but database replication lag meant the live-updates API could read stale share flag values
+- Browser caching of live-updates API responses could also serve stale data
+- Learning topic `collectionVisibility` field was not being checked by the live-updates API
+
+Changes Made:
+1. `src/app/(main)/profile/page.tsx`:
+   - All 5 toggle functions now: await PATCH response, check `r.ok`, await `fetchProfile()`, then delay 500ms before dispatching `sharing-updated` event
+   - This ensures database has replicated before feed/discover re-fetch
+2. `src/app/(main)/feed/page.tsx`:
+   - Added cache-busting (`?_t=timestamp`) and `cache: 'no-store'` to live-updates fetch
+3. `src/app/(main)/discover/page.tsx`:
+   - Same cache-busting changes as feed page
+4. `src/app/api/feed/live-updates/route.ts`:
+   - Added strong no-cache headers to response (Cache-Control, Pragma, Expires)
+   - Added `collectionVisibility` check for learning topics (private/followers/public)
+   - Updated visibility documentation in comments
 
 Stage Summary:
-- Bug Fix: Followers/following count now uses server-returned authoritative values from follow API
-- Bug Fix: Discover page now properly dispatches events and updates follow button state
-- Feature: Sharing toggles now actually control visibility (server-side enforcement)
-- Feature: Private account visibility enforced - private users' data only accessible to followers
-- Feature: Feed/discover pages refresh live updates when sharing settings change
-- All changes committed locally, need push to trigger Vercel deployment
+- Share toggles now properly control visibility with DB replication delay
+- No browser caching of live-updates responses
+- Learning topic `collectionVisibility` field now respected
+- Private account shared content only visible to followers (already worked, now more robust)
+---
+Task ID: 3 (IN PROGRESS)
+Agent: Main Agent
+Task: Deploy changes to Vercel project prj_PDDM0QOdpWjnOldnImawBRkqOOFd
+
+Work Log:
+- Build succeeds locally (`next build` completes without errors)
+- Fixed duplicate route issue (removed `(main)/contact` that conflicted with `(public)/contact`)
+- Vercel CLI installed but requires API token for authentication
+- No Vercel token found in environment or config files
+- Need user's Vercel API token to proceed with deployment
+
+Stage Summary:
+- Code changes are ready and build-verified
+- Deployment blocked - requires Vercel API token

@@ -107,7 +107,7 @@ export default function DiscoverPage() {
   // Auto-fetch live updates on page load
   const fetchLiveUpdates = useCallback(async () => {
     try {
-      const r = await fetch('/api/feed/live-updates');
+      const r = await fetch(`/api/feed/live-updates?_t=${Date.now()}`, { cache: 'no-store' });
       if (r.ok) {
         const d = await r.json();
         setLiveContentUpdates(d.contentUpdates || []);

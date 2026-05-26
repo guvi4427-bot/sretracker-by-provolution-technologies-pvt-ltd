@@ -176,46 +176,56 @@ export default function ProfilePage() {
 
   async function toggleShareAchievements(val: boolean) {
     try {
-      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareAchievements: val }) });
-      fetchProfile();
-      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
-      window.dispatchEvent(new CustomEvent('sharing-updated'));
+      const r = await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareAchievements: val }) });
+      if (r.ok) {
+        await fetchProfile();
+        // Small delay to allow database replication before notifying other pages
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('sharing-updated')); }, 500);
+      }
     } catch {}
   }
 
   async function toggleIsPublic(val: boolean) {
     try {
-      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isPublic: val }) });
-      fetchProfile();
-      // Notify feed/discover pages to re-fetch live updates — private account visibility changed
-      window.dispatchEvent(new CustomEvent('sharing-updated'));
+      const r = await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isPublic: val }) });
+      if (r.ok) {
+        await fetchProfile();
+        // Small delay to allow database replication before notifying other pages
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('sharing-updated')); }, 500);
+      }
     } catch {}
   }
 
   async function toggleShareFitnessProgress(val: boolean) {
     try {
-      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareFitnessProgress: val }) });
-      fetchProfile();
-      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
-      window.dispatchEvent(new CustomEvent('sharing-updated'));
+      const r = await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareFitnessProgress: val }) });
+      if (r.ok) {
+        await fetchProfile();
+        // Small delay to allow database replication before notifying other pages
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('sharing-updated')); }, 500);
+      }
     } catch {}
   }
 
   async function toggleShareContentStatus(val: boolean) {
     try {
-      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareContentStatus: val }) });
-      fetchProfile();
-      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
-      window.dispatchEvent(new CustomEvent('sharing-updated'));
+      const r = await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareContentStatus: val }) });
+      if (r.ok) {
+        await fetchProfile();
+        // Small delay to allow database replication before notifying other pages
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('sharing-updated')); }, 500);
+      }
     } catch {}
   }
 
   async function toggleShareLearningProgress(val: boolean) {
     try {
-      await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareLearningProgress: val }) });
-      fetchProfile();
-      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
-      window.dispatchEvent(new CustomEvent('sharing-updated'));
+      const r = await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareLearningProgress: val }) });
+      if (r.ok) {
+        await fetchProfile();
+        // Small delay to allow database replication before notifying other pages
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('sharing-updated')); }, 500);
+      }
     } catch {}
   }
 

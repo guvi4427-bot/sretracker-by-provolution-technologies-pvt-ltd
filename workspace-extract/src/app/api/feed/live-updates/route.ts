@@ -9,9 +9,11 @@ import { db } from '@/lib/db';
  * Fetches live content, fitness & learning updates from users.
  *
  * Visibility rules:
- *  - Own data: always included (if share setting is ON)
+ *  - Own data: included only if share setting is ON
  *  - Public profiles: included if their respective share setting is ON
  *  - Private profiles: included ONLY if the viewer follows them AND their share setting is ON
+ *  - If share setting is OFF, data is NEVER visible to others
+ *  - Private account: shared data is only visible to accepted followers
  */
 export async function GET(req: Request) {
   try {
@@ -70,10 +72,23 @@ export async function GET(req: Request) {
       },
       orderBy: { sharedAt: 'desc' },
       take: limit * 2, // fetch extra then filter
-    });
+    }) as any[];
 
     const learningUpdates = sharedTopics
-      .filter(t => isVisible(t.userId, t.user.profile?.isPublic !== false, t.user.profile?.shareLearningProgress === true))
+      .filter(t => {
+        // Check profile-level share setting first
+        if (!isVisible(t.userId, t.user.profile?.isPublic !== false, t.user.profile?.shareLearningProgress === true)) {
+          return false;
+        }
+        // Also respect topic-level collectionVisibility if set
+        const vis = (t as any).collectionVisibility;
+        if (vis === 'private') return false; // topic explicitly private
+        if (vis === 'followers') {
+          // Only visible to followers (same as private profile logic)
+          return t.userId === myUserId || followingIds.has(t.userId);
+        }
+        return true; // 'public' or not set
+      })
       .slice(0, limit)
       .map(t => ({
         id: t.id,
@@ -271,12 +286,17 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       learningUpdates,
       contentUpdates,
       fitnessUpdates,
       weightUpdates,
     });
+    // Ensure no caching so toggle changes are reflected immediately
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
   } catch (error) {
     console.error('Live updates GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch live updates' }, { status: 500 });
