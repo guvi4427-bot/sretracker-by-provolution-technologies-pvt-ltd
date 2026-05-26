@@ -105,3 +105,27 @@ Stage Summary:
 - Session Cleanup: 24h expiry with server-side stale cookie cleanup
 - SEO: Semantic H1 headings + VIEW-ONLY social restriction at API level
 - Both projects stable and functional
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix discover page search and tab switch not working properly
+
+Work Log:
+- Examined discover page at src/app/(main)/discover/page.tsx (725 lines)
+- Identified 3 root cause bugs:
+  1. search() function had early return for posts/users tabs when query was empty — prevented browsing without typing
+  2. Debounced useEffect only triggered for groups/topics or when query.trim() was non-empty — switching to posts/users tab with empty query never triggered a search
+  3. No empty state messages for posts, groups, users tabs
+- Applied surgical fixes:
+  1. Removed early return condition in search() — now always fetches from API (API already supports empty queries)
+  2. Changed debounced useEffect to always trigger search on tab/query change
+  3. Added empty state GlassCard messages for posts, groups, and users tabs
+- Deployed to pid1 (sretracker.vercel.app) ✓
+- Deployed to pid2 (sretrack.vercel.app) ✓
+- Restored pid1 project config
+
+Stage Summary:
+- Fixed: Tab switching now loads content for ALL tabs including posts and users
+- Fixed: Search works with or without a query across all tabs
+- Fixed: Empty states show helpful messages instead of blank space
+- Both deployments live at sretracker.vercel.app and sretrack.vercel.app

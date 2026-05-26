@@ -92,10 +92,6 @@ export default function DiscoverPage() {
   const search = useCallback(async (type?: string, searchQuery?: string) => {
     const tab = type || activeTabRef.current;
     const q = searchQuery ?? queryRef.current;
-    if (!q.trim() && tab !== 'groups' && tab !== 'topics') {
-      setResults(prev => ({ ...prev, [tab]: [] }));
-      return;
-    }
     setLoading(true);
     try {
       const r = await fetch(`/api/discover?type=${tab}&q=${encodeURIComponent(q.toLowerCase())}`);
@@ -103,8 +99,12 @@ export default function DiscoverPage() {
         const d = await r.json();
         const items = Array.isArray(d) ? d : (d[tab] || []);
         setResults(prev => ({ ...prev, [tab]: items }));
+      } else {
+        setResults(prev => ({ ...prev, [tab]: [] }));
       }
-    } catch {} finally { setLoading(false); }
+    } catch {
+      setResults(prev => ({ ...prev, [tab]: [] }));
+    } finally { setLoading(false); }
   }, []);
 
   // Auto-fetch live updates on page load
@@ -134,9 +134,8 @@ export default function DiscoverPage() {
   // Debounced search: auto-search when query or tab changes (300ms delay)
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (activeTab === 'groups' || activeTab === 'topics' || query.trim()) {
-      searchTimerRef.current = setTimeout(() => { search(); }, 300);
-    }
+    // Always trigger search on tab change or query change
+    searchTimerRef.current = setTimeout(() => { search(); }, 300);
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, [activeTab, query]); // removed `search` from deps — it's now stable
 
@@ -598,6 +597,13 @@ export default function DiscoverPage() {
 
         <TabsContent value="posts" className="space-y-3 mt-4">
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
+          (Array.isArray(results.posts) ? results.posts : []).length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No posts found</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Try searching for a keyword or hashtag</p>
+            </GlassCard>
+          ) :
           (Array.isArray(results.posts) ? results.posts : []).map((p: any) => (
             <GlassCard key={p.id} className="p-4">
               <div className="flex items-center gap-3 mb-2">
@@ -672,6 +678,13 @@ export default function DiscoverPage() {
 
         <TabsContent value="groups" className="space-y-3 mt-4">
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
+          (Array.isArray(results.groups) ? results.groups : []).length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <Users className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No groups found</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Try searching for a group name</p>
+            </GlassCard>
+          ) :
           (Array.isArray(results.groups) ? results.groups : []).map((g: any) => (
             <GlassCard key={g.id} className="p-4">
               <div className="flex items-center justify-between">
@@ -701,6 +714,13 @@ export default function DiscoverPage() {
 
         <TabsContent value="users" className="space-y-3 mt-4">
           {loading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div> :
+          (Array.isArray(results.users) ? results.users : []).length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <Users className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No users found</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Try searching for a name or username</p>
+            </GlassCard>
+          ) :
           (Array.isArray(results.users) ? results.users : []).map((u: any) => (
             <GlassCard key={u.id} className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/profile/${u.id}`)}>
