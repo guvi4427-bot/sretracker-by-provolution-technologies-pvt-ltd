@@ -117,14 +117,16 @@ export default function PublicProfilePage() {
               followingCount: serverFollowing ?? 0,
             };
           }
-          // Merge: use server data when available; if server returns undefined or 0 but we
-          // had a positive count from a recent follow action, keep the optimistic value to
-          // avoid the count disappearing during database replication delays.
+          // Merge strategy: use the HIGHER of server vs optimistic local count.
+          // This prevents the count from temporarily dropping to 0 due to DB
+          // replication lag after a follow/unfollow action.
+          const prevFollowers = prev.followersCount ?? 0;
+          const prevFollowing = prev.followingCount ?? 0;
           return {
             ...prev,
             ...data,
-            followersCount: serverFollowers !== undefined ? Math.max(0, serverFollowers) : prev.followersCount ?? 0,
-            followingCount: serverFollowing !== undefined ? Math.max(0, serverFollowing) : prev.followingCount ?? 0,
+            followersCount: serverFollowers !== undefined ? Math.max(serverFollowers, prevFollowers) : prevFollowers,
+            followingCount: serverFollowing !== undefined ? Math.max(serverFollowing, prevFollowing) : prevFollowing,
           };
         });
       }
