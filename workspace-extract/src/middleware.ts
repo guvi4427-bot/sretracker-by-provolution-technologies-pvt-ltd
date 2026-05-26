@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
   "/manifest.webmanifest", "/site.webmanifest", "/public",
   "/logo.svg", "/logo.png", "/ads.txt", "/app-ads.txt", "/robots.txt", "/sitemap.xml",
+  "/google990ef60d3a371354.html",
 ];
 
 // Paths that guests can browse (read-only, no interaction)
@@ -49,6 +50,7 @@ export async function middleware(request: NextRequest) {
     pathname === "/ads.txt" ||
     pathname === "/app-ads.txt" ||
     pathname.endsWith(".xml") ||
+    pathname === "/google990ef60d3a371354.html" ||
     pathname.endsWith(".webmanifest") ||
     pathname.endsWith(".ico")
   ) {

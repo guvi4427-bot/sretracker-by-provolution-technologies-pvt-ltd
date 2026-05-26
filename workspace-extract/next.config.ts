@@ -55,11 +55,36 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Type",
-            value: "application/xml",
+            value: "application/xml; charset=utf-8",
           },
           {
             key: "Cache-Control",
-            value: "public, max-age=86400",
+            value: "public, max-age=86400, s-maxage=86400",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*",
+          },
+        ],
+      },
+      {
+        source: "/google990ef60d3a371354.html",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "text/html; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, s-maxage=604800",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
         ],
       },
