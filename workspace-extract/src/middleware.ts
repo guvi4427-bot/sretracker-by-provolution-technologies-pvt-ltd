@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/terms", "/privacy", "/about", "/contact", "/community-guidelines", "/api/auth", "/api/health", "/_next", "/favicon", "/public", "/logo.svg", "/logo.png", "/ads.txt", "/robots.txt"];
+const PUBLIC_PATHS = ["/login", "/signup", "/terms", "/privacy", "/about", "/contact", "/community-guidelines", "/api/auth", "/api/health", "/_next", "/favicon", "/public", "/logo.svg", "/logo.png", "/ads.txt", "/robots.txt", "/sitemap.xml"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow static files
-  if (pathname.includes("_next/static") || pathname.includes("_next/image") || pathname.includes("favicon.ico") || pathname.includes("logo.svg") || pathname.includes("logo.png") || pathname.endsWith(".txt")) {
+  if (pathname.includes("_next/static") || pathname.includes("_next/image") || pathname.includes("favicon.ico") || pathname.includes("logo.svg") || pathname.includes("logo.png") || pathname.endsWith(".txt") || pathname.endsWith(".xml")) {
     return NextResponse.next();
   }
 

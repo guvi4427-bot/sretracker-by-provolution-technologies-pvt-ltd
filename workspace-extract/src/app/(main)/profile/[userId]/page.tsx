@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { BadgeCheck, Zap, Flame, Star, Trophy, UserPlus, UserMinus, BookOpen, Clock, Flag, AlertTriangle, Loader2, Dumbbell, Video, Share2, FileText, Film, Edit3, ExternalLink, PenTool, Check } from 'lucide-react';
+import { BadgeCheck, Zap, Flame, Star, Trophy, UserPlus, UserMinus, BookOpen, Clock, Flag, AlertTriangle, Loader2, Dumbbell, Video, Share2, FileText, Film, Edit3, ExternalLink, PenTool, Check, Lock } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { XPBar } from '@/components/xp-bar';
 import { StreakBadge } from '@/components/streak-badge';
@@ -104,22 +104,23 @@ export default function PublicProfilePage() {
       if (r.ok) {
         const data = await r.json();
         setUserData((prev: any) => {
+          const serverFollowers = typeof data.followersCount === 'number' ? data.followersCount : 0;
+          const serverFollowing = typeof data.followingCount === 'number' ? data.followingCount : 0;
           if (!prev) {
             // First load — use server data directly
             return {
               ...data,
-              followersCount: typeof data.followersCount === 'number' ? data.followersCount : 0,
-              followingCount: typeof data.followingCount === 'number' ? data.followingCount : 0,
+              followersCount: serverFollowers,
+              followingCount: serverFollowing,
             };
           }
-          // Merge: always preserve the HIGHER count (optimistic update vs server)
-          const serverFollowers = typeof data.followersCount === 'number' ? data.followersCount : prev.followersCount ?? 0;
-          const serverFollowing = typeof data.followingCount === 'number' ? data.followingCount : prev.followingCount ?? 0;
+          // Merge: trust server data for counts (authoritative), but never let them go negative
+          // If server returns 0 but we had a positive count, use server (could be a real unfollow)
           return {
             ...prev,
             ...data,
-            followersCount: Math.max(serverFollowers, prev.followersCount ?? 0),
-            followingCount: Math.max(serverFollowing, prev.followingCount ?? 0),
+            followersCount: Math.max(0, serverFollowers),
+            followingCount: Math.max(0, serverFollowing),
           };
         });
       }
@@ -130,32 +131,44 @@ export default function PublicProfilePage() {
   useEffect(() => { if (userId) loadUser(); }, [userId, loadUser]);
 
   // Fetch shared fitness/content data when profile loads
+  // Respects: share toggle (ON/OFF) + private account (only followers see shared data)
   useEffect(() => {
     if (!userData) return;
     const profileData = userData.profile || userData;
 
     async function fetchSharedData() {
-      // Fetch fitness progress if shareFitnessProgress is true
-      if (profileData.shareFitnessProgress) {
+      // For private accounts: only show shared data to accepted followers
+      // For public accounts: show shared data to everyone if toggle is ON
+      const isPrivateAccount = profileData.isPublic === false;
+      const canSeePrivateData = isPrivateAccount ? followStatus === 'accepted' : true;
+
+      // Fetch fitness progress if shareFitnessProgress is true AND viewer has access
+      if (profileData.shareFitnessProgress && canSeePrivateData) {
         const [wRes, wlRes] = await Promise.all([
           fetch(`/api/fitness/workout?userId=${userId}`),
           fetch(`/api/fitness/weight?userId=${userId}`)
         ]);
         if (wRes.ok) { const d = await wRes.json(); setSharedWorkouts(Array.isArray(d) ? d : d.workouts || []); }
         if (wlRes.ok) { const d = await wlRes.json(); setSharedWeightLogs(Array.isArray(d) ? d : d.weightLogs || []); }
+      } else {
+        setSharedWorkouts([]);
+        setSharedWeightLogs([]);
       }
 
-      // Fetch content series if shareContentStatus is true
-      if (profileData.shareContentStatus) {
+      // Fetch content series if shareContentStatus is true AND viewer has access
+      if (profileData.shareContentStatus && canSeePrivateData) {
         const cRes = await fetch(`/api/content/series?userId=${userId}`);
         if (cRes.ok) { const d = await cRes.json(); setSharedContentSeries(Array.isArray(d) ? d : d.series || []); }
         // Also fetch content entries for live status
         const eRes = await fetch(`/api/content/entries?userId=${userId}`);
         if (eRes.ok) { const d = await eRes.json(); setSharedContentEntries(Array.isArray(d) ? d : d.entries || []); }
+      } else {
+        setSharedContentSeries([]);
+        setSharedContentEntries([]);
       }
     }
     fetchSharedData();
-  }, [userData, userId]);
+  }, [userData, userId, followStatus]);
 
   // Check follow status (accepted or pending)
   useEffect(() => {
@@ -199,10 +212,10 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        // Update target user's followers count from server
+        // Update target user's followers count AND own following count from server response
         setUserData((prev: any) => {
           if (!prev) return prev;
-          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount;
+          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount ?? 0;
           return { ...prev, followersCount: newFollowers };
         });
       } else if (data.status === 'pending') {
@@ -214,7 +227,7 @@ export default function PublicProfilePage() {
         // Update target user's followers count from server
         setUserData((prev: any) => {
           if (!prev) return prev;
-          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount;
+          const newFollowers = typeof data.targetFollowersCount === 'number' ? data.targetFollowersCount : prev.followersCount ?? 0;
           return { ...prev, followersCount: newFollowers };
         });
       } else if (data.status === 'withdrawn') {
@@ -231,6 +244,8 @@ export default function PublicProfilePage() {
           }
         } catch {}
       }
+      // Dispatch follow-updated event so other pages (like own profile) refresh their counts
+      window.dispatchEvent(new CustomEvent('follow-updated'));
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
       // Delayed server refresh to get full authoritative data
@@ -316,6 +331,7 @@ export default function PublicProfilePage() {
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-foreground">{p.name || 'User'}</h2>
               {p.verified && <BadgeCheck size={18} className="text-blue-400 shrink-0" />}
+              {p.isPublic === false && <Lock size={14} className="text-amber-400 shrink-0" />}
             </div>
             <p className="text-sm text-muted-foreground">@{p.username || userData.username || ''}</p>
             <p className="text-sm text-muted-foreground mt-1">{p.bio || ''}</p>
@@ -349,6 +365,19 @@ export default function PublicProfilePage() {
           </div>
         </div>
       </GlassCard>
+
+      {/* Private Account Notice */}
+      {p.isPublic === false && followStatus !== 'accepted' && !isOwn && (
+        <GlassCard className="p-4 border-amber-500/30">
+          <div className="flex items-center gap-3">
+            <Lock size={18} className="text-amber-400 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Private Account</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Follow this account to see their shared progress and updates. Only approved followers can view their fitness, learning, and content data.</p>
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Active Phases */}
       {activePhases.length > 0 && (

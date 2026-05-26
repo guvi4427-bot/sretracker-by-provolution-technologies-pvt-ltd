@@ -146,18 +146,24 @@ export default function ProfilePage() {
 
   // Refresh follower/following counts when page gains focus (e.g., after following someone elsewhere)
   // Also listen for visibility change to refresh on route navigation back
+  // Also listen for follow-updated event dispatched from other profile pages
   useEffect(() => {
     function handleFocus() { fetchCounts(); }
     function handleXpOrNotifUpdate() { fetchCounts(); }
+    function handleFollowUpdate() { fetchCounts(); }
     function handleVisibility() { if (document.visibilityState === 'visible') fetchCounts(); }
     window.addEventListener('focus', handleFocus);
     window.addEventListener('xp-updated', handleXpOrNotifUpdate);
     window.addEventListener('notification-updated', handleXpOrNotifUpdate);
+    window.addEventListener('follow-updated', handleFollowUpdate);
+    window.addEventListener('sharing-updated', handleFollowUpdate);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('xp-updated', handleXpOrNotifUpdate);
       window.removeEventListener('notification-updated', handleXpOrNotifUpdate);
+      window.removeEventListener('follow-updated', handleFollowUpdate);
+      window.removeEventListener('sharing-updated', handleFollowUpdate);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [fetchCounts]);

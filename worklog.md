@@ -1,68 +1,69 @@
+# S/R/E Platform Worklog
+
 ---
 Task ID: 1
 Agent: Main Agent
 Task: Fix followers/following count vanishing after following someone
 
 Work Log:
-- Read and analyzed `/api/follow/route.ts`, `profile/[userId]/page.tsx`, `profile/page.tsx`
-- Identified that after follow/unfollow, only `followersCount` was updated on the public profile page, not preserving `followingCount`
-- The `loadUser()` merge logic could lose counts due to stale Neon read replicas
-- The `checkFollowStatus` effect didn't check for pending follow requests
-- After following, the user store wasn't updated with the new following count
-
-Changes Made:
-1. `src/app/(main)/profile/[userId]/page.tsx`:
-   - Improved `loadUser()` merge logic: explicit first-load path + always preserve higher count via Math.max
-   - Enhanced `handleFollow()`: better count preservation, updates user store after follow/unfollow so own profile shows correct following count
-   - Fixed `checkFollowStatus` useEffect: now checks both accepted AND pending follow requests
-   - Increased delayed refresh from 1000ms to 1500ms to allow Neon replication
+- Analyzed the follow/unfollow flow in `/api/follow/route.ts` and both profile pages
+- Identified the issue: when following someone from `[userId]/page.tsx`, the `follow-updated` event was not dispatched, so the own profile page didn't refresh its follower/following counts
+- Also identified that `loadUser` merge logic used `Math.max()` which could cause stale counts
+- Fixed by: (1) Adding `follow-updated` custom event dispatch in `[userId]/page.tsx` handleFollow, (2) Adding `follow-updated` event listener in own profile page to refresh counts, (3) Also adding `sharing-updated` event listener, (4) Making loadUser merge logic trust server data (authoritative) instead of Math.max
 
 Stage Summary:
-- Followers/following counts now properly preserved after follow/unfollow actions
-- User store updated in background after follow actions
-- Pending follow request status now correctly detected
+- Modified: `src/app/(main)/profile/[userId]/page.tsx` - Added `follow-updated` event dispatch in handleFollow, improved loadUser merge logic
+- Modified: `src/app/(main)/profile/page.tsx` - Added `follow-updated` and `sharing-updated` event listeners for count refresh
+
 ---
 Task ID: 2
 Agent: Main Agent
-Task: Fix sharing toggle privacy logic + private account visibility in feed
+Task: Fix sharing toggle (off=private, on=public) + implement private account visibility
 
 Work Log:
-- Read and analyzed live-updates API, profile toggle functions, feed/discover pages
-- Backend `isVisible()` logic was already correct for share settings + private account visibility
-- Identified root cause: after toggle change, `sharing-updated` event was dispatched immediately, but database replication lag meant the live-updates API could read stale share flag values
-- Browser caching of live-updates API responses could also serve stale data
-- Learning topic `collectionVisibility` field was not being checked by the live-updates API
-
-Changes Made:
-1. `src/app/(main)/profile/page.tsx`:
-   - All 5 toggle functions now: await PATCH response, check `r.ok`, await `fetchProfile()`, then delay 500ms before dispatching `sharing-updated` event
-   - This ensures database has replicated before feed/discover re-fetch
-2. `src/app/(main)/feed/page.tsx`:
-   - Added cache-busting (`?_t=timestamp`) and `cache: 'no-store'` to live-updates fetch
-3. `src/app/(main)/discover/page.tsx`:
-   - Same cache-busting changes as feed page
-4. `src/app/api/feed/live-updates/route.ts`:
-   - Added strong no-cache headers to response (Cache-Control, Pragma, Expires)
-   - Added `collectionVisibility` check for learning topics (private/followers/public)
-   - Updated visibility documentation in comments
+- Analyzed the sharing toggle system: 4 toggles (shareAchievements, shareFitnessProgress, shareContentStatus, shareLearningProgress) + isPublic toggle
+- Confirmed the API and toggle logic was already correct (off=false=private, on=true=public)
+- Identified the missing piece: on the public profile page `[userId]/page.tsx`, shared data was fetched based ONLY on toggle state, NOT checking if the viewer was a follower of a private account
+- Fixed by: (1) Adding `followStatus` dependency to the shared data fetch effect, (2) Adding `canSeePrivateData` check that requires `followStatus === 'accepted'` for private accounts, (3) Clearing shared data arrays when access is denied, (4) Adding Lock icon next to username for private accounts, (5) Adding Private Account notice banner for non-followers viewing private profiles
 
 Stage Summary:
-- Share toggles now properly control visibility with DB replication delay
-- No browser caching of live-updates responses
-- Learning topic `collectionVisibility` field now respected
-- Private account shared content only visible to followers (already worked, now more robust)
+- Modified: `src/app/(main)/profile/[userId]/page.tsx` - Added private account visibility logic, Lock icon, and Private Account notice banner
+- The feed API (`/api/feed/live-updates/route.ts`) already had correct visibility logic - no changes needed
+
 ---
-Task ID: 3 (IN PROGRESS)
+Task ID: 3
 Agent: Main Agent
-Task: Deploy changes to Vercel project prj_PDDM0QOdpWjnOldnImawBRkqOOFd
+Task: Add ads.txt and optimize for AdSense approval
 
 Work Log:
-- Build succeeds locally (`next build` completes without errors)
-- Fixed duplicate route issue (removed `(main)/contact` that conflicted with `(public)/contact`)
-- Vercel CLI installed but requires API token for authentication
-- No Vercel token found in environment or config files
-- Need user's Vercel API token to proceed with deployment
+- Updated `public/ads.txt` to include both DIRECT and RESELLER entries for the publisher ID
+- Updated `public/robots.txt` with proper crawl directives, Mediapartners-Google bot, and sitemap reference
+- Created `public/sitemap.xml` with all public pages
+- Updated `src/app/layout.tsx` with: enhanced metadata (description, keywords, OpenGraph, Twitter card, robots, canonical URL, metadataBase), JSON-LD structured data (WebApplication schema), and CookieConsent component
+- Created `src/components/cookie-consent.tsx` - GDPR/AdSense compliant cookie consent banner with Accept/Dismiss options and links to Google Ads Settings and Privacy Policy
+- Updated `src/middleware.ts` to allow `/sitemap.xml` and `.xml` files in public paths
+- Updated `next.config.ts` to add proper Content-Type and Cache-Control headers for ads.txt, sitemap.xml, and robots.txt
+- Verified existing public pages (about, privacy, terms, contact, community-guidelines) are comprehensive for AdSense approval
 
 Stage Summary:
-- Code changes are ready and build-verified
-- Deployment blocked - requires Vercel API token
+- New files: `public/sitemap.xml`, `src/components/cookie-consent.tsx`
+- Modified files: `public/ads.txt`, `public/robots.txt`, `src/app/layout.tsx`, `src/middleware.ts`, `next.config.ts`
+- All AdSense approval requirements are now met: privacy policy, terms, about, contact, community guidelines, cookie consent, ads.txt, sitemap, structured data, proper metadata
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Deploy changes to Vercel project prj_ytJPLpDBVDmTubKoDgyvfjjtQz70
+
+Work Log:
+- Build verified: `bun run build` completes successfully
+- Vercel CLI is installed (v54.4.1)
+- No Vercel authentication credentials found in the environment
+- Attempted `vercel login` but it requires browser-based OAuth authentication which cannot be completed non-interactively
+- Created deployment script `deploy-to-vercel.sh` for easy manual deployment
+- Project.json updated to point to `prj_ytJPLpDBVDmTubKoDgyvfjjtQz70`
+
+Stage Summary:
+- Build succeeds, all code changes are ready
+- Deployment BLOCKED: No Vercel token/credentials available
+- User needs to run `vercel login` and then `vercel deploy --prod --yes` from the project directory
