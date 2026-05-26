@@ -11,10 +11,34 @@ export async function GET(request: Request) {
 
     // If userId is provided (public profile), use it; otherwise use logged-in user
     let userId: string;
+    let isOwnData = true;
     if (targetUserId) {
       userId = targetUserId;
+      isOwnData = false;
     } else {
       userId = await getUserId();
+    }
+
+    // Access control: check sharing settings and private account when viewing another user's data
+    if (!isOwnData && targetUserId) {
+      const viewerId = await getUserId();
+      if (viewerId !== targetUserId) {
+        const targetProfile = await db.profile.findUnique({ where: { userId: targetUserId }, select: { shareContentStatus: true, isPublic: true } });
+        // If sharing is OFF, deny access
+        if (!targetProfile?.shareContentStatus) {
+          return NextResponse.json({ entries: [] });
+        }
+        // If private account, check if viewer follows them
+        if (targetProfile.isPublic === false) {
+          const follow = await db.follow.findUnique({
+            where: { followerId_followingId: { followerId: viewerId, followingId: targetUserId } },
+            select: { status: true },
+          });
+          if (follow?.status !== 'accepted') {
+            return NextResponse.json({ entries: [] });
+          }
+        }
+      }
     }
 
     const where: any = { userId };

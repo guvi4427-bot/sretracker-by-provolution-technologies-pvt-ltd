@@ -93,7 +93,12 @@ export async function POST(req: Request) {
         // Re-check follower-based achievements for both users after unfollow
         try { await checkAndNotifyEligibleAchievements(userId); } catch {}
         try { await checkAndNotifyEligibleAchievements(session.user.id); } catch {}
-        return NextResponse.json({ status: 'unfollowed' });
+        // Return updated counts for both users
+        const [targetFollowersCount, myFollowingCount] = await Promise.all([
+          db.follow.count({ where: { followingId: userId, status: 'accepted' } }),
+          db.follow.count({ where: { followerId: session.user.id, status: 'accepted' } }),
+        ]);
+        return NextResponse.json({ status: 'unfollowed', targetFollowersCount, myFollowingCount });
       }
       // Already pending - withdraw
       await db.follow.delete({ where: { id: existing.id } });
@@ -132,7 +137,12 @@ export async function POST(req: Request) {
     try { await checkAndNotifyEligibleAchievements(userId); } catch {}
     try { await checkAndNotifyEligibleAchievements(session.user.id); } catch {}
 
-    return NextResponse.json({ status: follow.status, follow });
+    // Return updated counts for both users so client can update UI accurately
+    const [targetFollowersCount, myFollowingCount] = await Promise.all([
+      db.follow.count({ where: { followingId: userId, status: 'accepted' } }),
+      db.follow.count({ where: { followerId: session.user.id, status: 'accepted' } }),
+    ]);
+    return NextResponse.json({ status: follow.status, follow, targetFollowersCount, myFollowingCount });
   } catch (error) {
     console.error('Follow error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

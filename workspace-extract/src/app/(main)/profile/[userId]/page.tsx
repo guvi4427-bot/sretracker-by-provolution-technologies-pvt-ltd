@@ -179,27 +179,27 @@ export default function PublicProfilePage() {
       if (data.status === 'accepted') {
         setFollowStatus('accepted');
         toast.success('Following!');
-        setUserData((prev: any) => prev ? {
-          ...prev,
-          followersCount: (prev.followersCount ?? 0) + 1,
-        } : prev);
+        // Use server-returned authoritative counts instead of optimistic math
+        if (typeof data.targetFollowersCount === 'number') {
+          setUserData((prev: any) => prev ? { ...prev, followersCount: data.targetFollowersCount } : prev);
+        }
       } else if (data.status === 'pending') {
         setFollowStatus('pending');
         toast.success('Follow request sent');
       } else if (data.status === 'unfollowed') {
         setFollowStatus('none');
         toast.success('Unfollowed');
-        setUserData((prev: any) => prev ? {
-          ...prev,
-          followersCount: Math.max(0, (prev.followersCount ?? 0) - 1),
-        } : prev);
+        // Use server-returned authoritative counts
+        if (typeof data.targetFollowersCount === 'number') {
+          setUserData((prev: any) => prev ? { ...prev, followersCount: data.targetFollowersCount } : prev);
+        }
       } else if (data.status === 'withdrawn') {
         setFollowStatus('none');
         toast.success('Request withdrawn');
       }
       window.dispatchEvent(new CustomEvent('xp-updated'));
       window.dispatchEvent(new CustomEvent('notification-updated'));
-      // Delayed server refresh to get authoritative counts (safe merge uses Math.max)
+      // Delayed server refresh to get full authoritative data
       setTimeout(() => { loadUser(); }, 1000);
     } catch {}
   }

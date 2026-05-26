@@ -87,6 +87,8 @@ export async function GET(
           isPublic: false,
           shareAchievements: user.profile.shareAchievements,
           shareLearningProgress: user.profile.shareLearningProgress,
+          shareFitnessProgress: user.profile.shareFitnessProgress,
+          shareContentStatus: user.profile.shareContentStatus,
         },
         followersCount: followerCount,
         followingCount: followingCount,
@@ -114,6 +116,8 @@ export async function GET(
         isPublic: true,
         shareAchievements: user.profile.shareAchievements,
         shareLearningProgress: user.profile.shareLearningProgress,
+        shareFitnessProgress: user.profile.shareFitnessProgress,
+        shareContentStatus: user.profile.shareContentStatus,
       },
       achievements: user.profile.shareAchievements
         ? user.achievements.map((a) => ({

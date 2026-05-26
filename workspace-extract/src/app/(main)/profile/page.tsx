@@ -145,16 +145,20 @@ export default function ProfilePage() {
   useEffect(() => { fetchCounts(); fetchAchievements(); fetchLearningTopics(); fetchMyPosts(); }, [fetchCounts, fetchAchievements, fetchLearningTopics, fetchMyPosts]);
 
   // Refresh follower/following counts when page gains focus (e.g., after following someone elsewhere)
+  // Also listen for visibility change to refresh on route navigation back
   useEffect(() => {
     function handleFocus() { fetchCounts(); }
     function handleXpOrNotifUpdate() { fetchCounts(); }
+    function handleVisibility() { if (document.visibilityState === 'visible') fetchCounts(); }
     window.addEventListener('focus', handleFocus);
     window.addEventListener('xp-updated', handleXpOrNotifUpdate);
     window.addEventListener('notification-updated', handleXpOrNotifUpdate);
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('xp-updated', handleXpOrNotifUpdate);
       window.removeEventListener('notification-updated', handleXpOrNotifUpdate);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [fetchCounts]);
 
@@ -174,6 +178,8 @@ export default function ProfilePage() {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareAchievements: val }) });
       fetchProfile();
+      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
+      window.dispatchEvent(new CustomEvent('sharing-updated'));
     } catch {}
   }
 
@@ -181,6 +187,8 @@ export default function ProfilePage() {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isPublic: val }) });
       fetchProfile();
+      // Notify feed/discover pages to re-fetch live updates — private account visibility changed
+      window.dispatchEvent(new CustomEvent('sharing-updated'));
     } catch {}
   }
 
@@ -188,6 +196,8 @@ export default function ProfilePage() {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareFitnessProgress: val }) });
       fetchProfile();
+      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
+      window.dispatchEvent(new CustomEvent('sharing-updated'));
     } catch {}
   }
 
@@ -195,6 +205,8 @@ export default function ProfilePage() {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareContentStatus: val }) });
       fetchProfile();
+      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
+      window.dispatchEvent(new CustomEvent('sharing-updated'));
     } catch {}
   }
 
@@ -202,6 +214,8 @@ export default function ProfilePage() {
     try {
       await fetch('/api/user/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shareLearningProgress: val }) });
       fetchProfile();
+      // Notify feed/discover pages to re-fetch live updates with updated sharing settings
+      window.dispatchEvent(new CustomEvent('sharing-updated'));
     } catch {}
   }
 
@@ -543,7 +557,7 @@ export default function ProfilePage() {
               </div>
               <Switch checked={profile.shareFitnessProgress} onCheckedChange={toggleShareFitnessProgress} />
             </div>
-            <p className="text-[10px] text-muted-foreground/50 mt-1">Show your weight progress and workout history on your public profile</p>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">{profile.shareFitnessProgress ? 'Your weight progress and workout history are visible in feed & public profile' : 'Your fitness data is private — not visible in feed or on your public profile'}</p>
           </GlassCard>
           <GlassCard className="p-5">
             <div className="flex items-center justify-between">
@@ -553,7 +567,7 @@ export default function ProfilePage() {
               </div>
               <Switch checked={profile.shareContentStatus} onCheckedChange={toggleShareContentStatus} />
             </div>
-            <p className="text-[10px] text-muted-foreground/50 mt-1">Show your content creation series and live status on your public profile</p>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">{profile.shareContentStatus ? 'Your content series and live status are visible in feed & public profile' : 'Your content data is private — not visible in feed or on your public profile'}</p>
           </GlassCard>
           <GlassCard className="p-5">
             <div className="flex items-center justify-between">
@@ -563,7 +577,7 @@ export default function ProfilePage() {
               </div>
               <Switch checked={profile.shareLearningProgress} onCheckedChange={toggleShareLearningProgress} />
             </div>
-            <p className="text-[10px] text-muted-foreground/50 mt-1">Show your shared learning topics and entry counts in the feed and discover page</p>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">{profile.shareLearningProgress ? 'Your shared learning topics are visible in feed & discover page' : 'Your learning data is private — not visible in feed or discover'}</p>
           </GlassCard>
           <GlassCard className="p-5">
             <div className="flex items-center justify-between">
@@ -574,7 +588,7 @@ export default function ProfilePage() {
               <Switch checked={profile.isPublic} onCheckedChange={toggleIsPublic} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {profile.isPublic ? 'Anyone can see your profile and follow you automatically' : 'Users must send a follow request to see your profile'}
+              {profile.isPublic ? 'Anyone can see your profile and follow you automatically. Shared progress is visible to everyone.' : 'Users must send a follow request. Your shared progress is only visible to your followers.'}
             </p>
           </GlassCard>
         </TabsContent>

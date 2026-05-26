@@ -161,11 +161,12 @@ export default function FeedPage() {
 
   useEffect(() => { fetchPosts(true); fetchLiveData(); fetchLiveUpdates(); }, [fetchPosts, fetchLiveData, fetchLiveUpdates]);
 
-  // Listen for xp-updated events to refresh live data
+  // Listen for xp-updated and sharing-updated events to refresh live data
   useEffect(() => {
     const handler = () => { fetchLiveData(); fetchLiveUpdates(); };
     window.addEventListener('xp-updated', handler);
-    return () => { window.removeEventListener('xp-updated', handler); };
+    window.addEventListener('sharing-updated', handler);
+    return () => { window.removeEventListener('xp-updated', handler); window.removeEventListener('sharing-updated', handler); };
   }, [fetchLiveData, fetchLiveUpdates]);
 
   // Visibility/focus refetch

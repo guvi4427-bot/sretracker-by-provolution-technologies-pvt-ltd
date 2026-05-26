@@ -120,11 +120,12 @@ export default function DiscoverPage() {
 
   useEffect(() => { fetchLiveUpdates(); }, [fetchLiveUpdates]);
 
-  // Listen for xp-updated events to refresh live data
+  // Listen for xp-updated and sharing-updated events to refresh live data
   useEffect(() => {
     const handler = () => { fetchLiveUpdates(); };
     window.addEventListener('xp-updated', handler);
-    return () => { window.removeEventListener('xp-updated', handler); };
+    window.addEventListener('sharing-updated', handler);
+    return () => { window.removeEventListener('xp-updated', handler); window.removeEventListener('sharing-updated', handler); };
   }, [fetchLiveUpdates]);
 
   // Debounced search: auto-search when query or tab changes (300ms delay)
@@ -146,7 +147,29 @@ export default function DiscoverPage() {
   }, []);
 
   async function followUser(userId: string) {
-    try { await fetch('/api/follow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }); search('users'); } catch {}
+    try {
+      const r = await fetch('/api/follow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+      if (r.ok) {
+        const data = await r.json();
+        // Dispatch events so other pages (profile, feed) update their counts
+        window.dispatchEvent(new CustomEvent('xp-updated'));
+        window.dispatchEvent(new CustomEvent('notification-updated'));
+        // Update local results to reflect the new follow status
+        setResults(prev => ({
+          ...prev,
+          users: (prev.users || []).map((u: any) => {
+            if (u.id !== userId) return u;
+            if (data.status === 'accepted') return { ...u, isFollowing: true, followRequestStatus: 'accepted' };
+            if (data.status === 'pending') return { ...u, isFollowing: false, followRequestStatus: 'pending' };
+            if (data.status === 'unfollowed') return { ...u, isFollowing: false, followRequestStatus: 'none' };
+            if (data.status === 'withdrawn') return { ...u, isFollowing: false, followRequestStatus: 'none' };
+            return u;
+          }),
+        }));
+        // Also re-search to get fresh data
+        search('users');
+      }
+    } catch {}
   }
 
   async function joinGroup(groupId: string) {
