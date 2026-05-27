@@ -23,33 +23,46 @@ export default function ContactPage() {
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-          <div className="p-6 rounded-xl bg-gradient-to-br from-blue-600/10 to-cyan-600/10 border border-blue-500/20">
+          <a
+            href="mailto:myselfgowtham140707@gmail.com"
+            className="p-6 rounded-xl bg-gradient-to-br from-blue-600/10 to-cyan-600/10 border border-blue-500/20 hover:border-blue-500/40 transition-colors block"
+          >
             <div className="text-2xl mb-3">&#9993;</div>
             <h2 className="text-lg font-bold mb-2">Email</h2>
             <p className="text-sm text-muted-foreground mb-4">
               For general inquiries, support requests, and partnership opportunities, email us directly. We monitor this inbox regularly and prioritize urgent issues.
             </p>
-            <p className="text-blue-400 font-medium">support@sre.app</p>
-          </div>
+            <p className="text-blue-400 font-medium">myselfgowtham140707@gmail.com</p>
+          </a>
 
-          <div className="p-6 rounded-xl bg-gradient-to-br from-pink-600/10 to-purple-600/10 border border-pink-500/20">
+          <a
+            href="https://www.instagram.com/myselfgowtham07?igsh=c2JudTYzYWg1bWx4"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-6 rounded-xl bg-gradient-to-br from-pink-600/10 to-purple-600/10 border border-pink-500/20 hover:border-pink-500/40 transition-colors block"
+          >
             <div className="text-2xl mb-3">&#128247;</div>
             <h2 className="text-lg font-bold mb-2">Instagram</h2>
             <p className="text-sm text-muted-foreground mb-4">
               Follow us for updates, community highlights, motivation, and tips on making the most of your {SITE_SHORT_NAME} journey. DMs are open for quick questions.
             </p>
-            <p className="text-pink-400 font-medium">@sre_platform</p>
-          </div>
+            <p className="text-pink-400 font-medium">@myselfgowtham07</p>
+          </a>
         </div>
 
-        <div className="p-6 rounded-xl bg-gradient-to-br from-red-600/10 to-red-800/10 border border-red-500/20 mb-8">
+        <a
+          href="https://www.youtube.com/@myselfgowtham_07"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-6 rounded-xl bg-gradient-to-br from-red-600/10 to-red-800/10 border border-red-500/20 hover:border-red-500/40 transition-colors block mb-8"
+        >
           <div className="text-2xl mb-3">&#9654;</div>
           <h2 className="text-lg font-bold mb-2">YouTube</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Subscribe to our channel for tutorials, feature walkthroughs, community spotlights, and motivational content to support your self-growth journey.
           </p>
-          <p className="text-red-400 font-medium">S/R/E Channel</p>
-        </div>
+          <p className="text-red-400 font-medium">@myselfgowtham_07</p>
+        </a>
 
         <div className="p-6 rounded-xl border border-border mb-8">
           <h2 className="text-lg font-bold mb-3">Feedback and Bug Reports</h2>
