@@ -26,6 +26,7 @@ const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color:
   ],
   video: [
     { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: Film },
+    { key: 'scripted', label: 'Scripted', color: 'text-purple-400 bg-purple-600/20', icon: PenTool },
     { key: 'shoot', label: 'Shoot', color: 'text-red-400 bg-red-600/20', icon: Video },
     { key: 'edit', label: 'Edit', color: 'text-amber-400 bg-amber-600/20', icon: Edit3 },
     { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },

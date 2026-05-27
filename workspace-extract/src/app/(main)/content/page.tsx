@@ -117,6 +117,7 @@ export default function ContentPage() {
         fetchEntries();
         window.dispatchEvent(new CustomEvent('xp-updated'));
         window.dispatchEvent(new CustomEvent('notification-updated'));
+        window.dispatchEvent(new CustomEvent('sharing-updated'));
       } else {
         const d = await r.json();
         toast.error(d.error || 'Failed to update status');

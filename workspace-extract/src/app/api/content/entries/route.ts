@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserId } from '@/lib/auth-helper';
 import { awardXP, updateStreak, reverseXP } from '@/lib/xp';
+import { checkAndNotifyEligibleAchievements } from '@/lib/achievements';
 
 export async function GET(request: Request) {
   try {
@@ -138,6 +139,11 @@ export async function PATCH(request: Request) {
         ...(postDate !== undefined && { postDate }),
       },
     });
+
+    // Trigger achievement eligibility check when liveStatus changes
+    if (liveStatus !== undefined && liveStatus !== existing.liveStatus) {
+      try { await checkAndNotifyEligibleAchievements(userId); } catch {}
+    }
 
     return NextResponse.json({ entry });
   } catch (error) {

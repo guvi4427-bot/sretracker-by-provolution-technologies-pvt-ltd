@@ -97,3 +97,35 @@ Stage Summary:
 - 32/32 checks passed — PRODUCTION STABLE
 - No redeployment needed — current deployment is healthy
 - Minor 404s for site.webmanifest/llms.txt are non-critical (manifest.webmanifest works)
+---
+Task ID: 1
+Agent: main
+Task: Fix live content sharing rich card missing from feed/discover, and script writer achievement unclaimable
+
+Work Log:
+- Explored codebase to find feed, discover, live sharing, and achievements systems
+- Found 4 bugs across multiple files:
+  1. Discover page missing 'scripted' step in video LIVE_STATUS_PIPELINES (caused broken pipeline rendering)
+  2. Profile page also missing 'scripted' step in video LIVE_STATUS_PIPELINES
+  3. /api/achievements/route.ts had outdated content_scripts/content_videos/content_blogs criteria (only checked series.category, not contentType or liveStatus)
+  4. Content entry PATCH didn't trigger achievement eligibility check when liveStatus changed
+  5. Content page's updateLiveStatus didn't dispatch 'sharing-updated' event (so feed/discover didn't refresh)
+
+- Fixed all 4 issues:
+  1. Added 'scripted' step to discover page video pipeline
+  2. Added 'scripted' step to profile page video pipeline
+  3. Updated /api/achievements/route.ts criteria checks to match /lib/achievements.ts
+  4. Added checkAndNotifyEligibleAchievements call in content entry PATCH
+  5. Added sharing-updated event dispatch in content page's updateLiveStatus
+
+- Build verified successful
+- Deployed to both projects:
+  - sretracker.vercel.app ✅
+  - sretrack.vercel.app ✅
+
+Stage Summary:
+- All fixes applied in isolation (no changes to critical/working code)
+- Rich cards should now render correctly in feed and discover when sharing is enabled
+- Script Writer achievement should now be claimable when video liveStatus is set to 'scripted'
+- Achievement eligibility is now checked when liveStatus changes
+- Feed/discover pages now refresh when live status is updated
