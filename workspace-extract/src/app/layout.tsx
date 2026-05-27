@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(CANONICAL_URL),
   alternates: {
     canonical: CANONICAL_URL,
   },
