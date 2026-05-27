@@ -110,7 +110,11 @@ export async function GET(req: Request) {
 
     // ── Content Updates ──
     // Need to check shareContentStatus + isPublic/follower status
+    // Only show entries that have progressed past "not_started" to avoid cluttering the feed
     const contentEntries = await db.contentEntry.findMany({
+      where: {
+        liveStatus: { not: 'not_started' },
+      },
       include: {
         user: {
           select: {
@@ -119,7 +123,7 @@ export async function GET(req: Request) {
             profile: { select: { name: true, avatarUrl: true, verified: true, isPublic: true, shareContentStatus: true } },
           },
         },
-        series: { select: { name: true } },
+        series: { select: { name: true, category: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: limit * 2,
@@ -139,6 +143,7 @@ export async function GET(req: Request) {
         updatedAt: e.updatedAt,
         createdAt: e.createdAt,
         seriesName: e.series?.name || null,
+        seriesCategory: e.series?.category || null,
         isOwn: !isGuest && e.userId === myUserId,
         user: {
           id: e.user.id,

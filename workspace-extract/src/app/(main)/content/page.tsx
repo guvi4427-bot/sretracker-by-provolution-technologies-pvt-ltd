@@ -19,6 +19,12 @@ import { PLATFORMS } from '@/lib/constants';
 const TABS_LIST = ['overview', 'series', 'calendar', 'createEntry', 'aiAssistant'];
 const STATUS_OPTIONS = ['idea', 'drafting', 'editing', 'published', 'archived'];
 const CONTENT_TYPES = ['blog', 'video', 'post'] as const;
+const SERIES_CATEGORIES = [
+  { value: '', label: 'General' },
+  { value: 'script', label: 'Script' },
+  { value: 'video', label: 'Video' },
+  { value: 'blog', label: 'Blog' },
+] as const;
 
 // Live status pipeline per content type
 const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color: string; icon: any }[]> = {
@@ -29,6 +35,7 @@ const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color:
   ],
   video: [
     { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: Film },
+    { key: 'scripted', label: 'Scripted', color: 'text-purple-400 bg-purple-600/20', icon: PenTool },
     { key: 'shoot', label: 'Shoot', color: 'text-red-400 bg-red-600/20', icon: Video },
     { key: 'edit', label: 'Edit', color: 'text-amber-400 bg-amber-600/20', icon: Edit3 },
     { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },
@@ -64,6 +71,7 @@ export default function ContentPage() {
   const [entryShootDate, setEntryShootDate] = useState('');
   const [entryPostDate, setEntryPostDate] = useState('');
   const [newSeriesName, setNewSeriesName] = useState('');
+  const [newSeriesCategory, setNewSeriesCategory] = useState('');
   const [aiReview, setAiReview] = useState<any>(null);
   const [aiPostingTime, setAiPostingTime] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -85,7 +93,7 @@ export default function ContentPage() {
 
   async function createSeries() {
     if (!newSeriesName.trim()) return;
-    try { const r = await fetch('/api/content/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSeriesName }) }); if (r.ok) { setNewSeriesName(''); fetchSeries(); } } catch {}
+    try { const r = await fetch('/api/content/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSeriesName, category: newSeriesCategory || undefined }) }); if (r.ok) { setNewSeriesName(''); setNewSeriesCategory(''); fetchSeries(); } } catch {}
   }
 
   async function createEntry() {
@@ -359,12 +367,21 @@ export default function ContentPage() {
         {/* ═══ SERIES TAB ═══ */}
         <TabsContent value="series" className="space-y-4 mt-4">
           <GlassCard className="p-4">
-            <div className="flex gap-2 mb-4"><Input value={newSeriesName} onChange={e => setNewSeriesName(e.target.value)} placeholder="New series name" className="bg-accent border-border text-foreground placeholder:text-muted-foreground/50" /><Button onClick={createSeries} className="gradient-blue shrink-0"><Plus size={16} /></Button></div>
+            <div className="flex gap-2 mb-4">
+              <Input value={newSeriesName} onChange={e => setNewSeriesName(e.target.value)} placeholder="New series name" className="bg-accent border-border text-foreground placeholder:text-muted-foreground/50 flex-1" />
+              <select value={newSeriesCategory} onChange={e => setNewSeriesCategory(e.target.value)} className="bg-accent border border-border text-foreground rounded-md px-2 py-2 text-sm min-w-[100px]">
+                {SERIES_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              <Button onClick={createSeries} className="gradient-blue shrink-0"><Plus size={16} /></Button>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">{series.map((s: any) => (
               <GlassCard key={s.id} className="p-3 cursor-pointer hover:border-border group relative" onClick={() => viewSeriesDetail(s)}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{s.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-foreground">{s.name}</p>
+                      {s.category && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-600/15 text-purple-300 font-medium">{s.category}</span>}
+                    </div>
                     <p className="text-[10px] text-muted-foreground/70">{s.description || ''}</p>
                     {s._count?.entries !== undefined && <p className="text-[10px] text-muted-foreground/50 mt-1">{s._count.entries} entries</p>}
                   </div>

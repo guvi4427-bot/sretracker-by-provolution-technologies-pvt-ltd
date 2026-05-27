@@ -120,15 +120,29 @@ async function checkCriteria(userId: string, criteria: CriteriaCheck): Promise<{
     case 'content_posts':
       current = await db.post.count({ where: { userId } });
       break;
-    case 'content_scripts':
-      current = await db.contentEntry.count({ where: { userId, series: { category: 'script' } } });
+    case 'content_scripts': {
+      // Count entries where series.category is 'script' OR (contentType is 'video' and has moved past scripted step)
+      const scriptBySeries = await db.contentEntry.count({ where: { userId, series: { category: 'script' } } });
+      const scriptByLiveStatus = await db.contentEntry.count({ where: { userId, contentType: 'video', liveStatus: { in: ['scripted', 'shoot', 'edit', 'posted'] } } });
+      current = scriptBySeries + scriptByLiveStatus;
       break;
-    case 'content_videos':
-      current = await db.contentEntry.count({ where: { userId, series: { category: 'video' } } });
+    }
+    case 'content_videos': {
+      // Count video entries: series.category is 'video' OR contentType is 'video'
+      const vidBySeries = await db.contentEntry.count({ where: { userId, series: { category: 'video' } } });
+      // Count video-type entries NOT already counted by series category
+      const vidByType = await db.contentEntry.count({ where: { userId, contentType: 'video', series: { OR: [{ category: null }, { category: { not: 'video' } }] } } });
+      current = vidBySeries + vidByType;
       break;
-    case 'content_blogs':
-      current = await db.contentEntry.count({ where: { userId, series: { category: 'blog' } } });
+    }
+    case 'content_blogs': {
+      // Count blog entries: series.category is 'blog' OR contentType is 'blog'
+      const blogBySeries = await db.contentEntry.count({ where: { userId, series: { category: 'blog' } } });
+      // Count blog-type entries NOT already counted by series category
+      const blogByType = await db.contentEntry.count({ where: { userId, contentType: 'blog', series: { OR: [{ category: null }, { category: { not: 'blog' } }] } } });
+      current = blogBySeries + blogByType;
       break;
+    }
     case 'content_live_posted':
       current = await db.contentEntry.count({ where: { userId, liveStatus: 'posted' } });
       break;

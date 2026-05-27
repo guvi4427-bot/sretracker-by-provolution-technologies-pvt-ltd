@@ -150,7 +150,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { key: "fit_wt_load_increase", name: "Progressive Overload", description: "Increase your training load for the first time", iconEmoji: "📈", xpReward: 30, tier: "bronze", category: "fitness", criteria: { type: "weight_training_load_increase", value: 1 } },
   { key: "fit_wt_rep_increase", name: "Rep Climber", description: "Log more reps than your previous best", iconEmoji: "🔁", xpReward: 30, tier: "bronze", category: "fitness", criteria: { type: "weight_training_rep_increase", value: 1 } },
   { key: "fit_wt_set_increase", name: "Volume Builder", description: "Log more sets than your previous session", iconEmoji: "📊", xpReward: 30, tier: "bronze", category: "fitness", criteria: { type: "weight_training_set_increase", value: 1 } },
-  { key: "fit_wt_intermediate", name: "Strength Forged", description: "Log 25 weight training sessions with progressive load increases", iconEmoji: "⚙️", xpReward: 100, tier: "silver", category: "fitness", criteria: { type: "weight_training_intermediate", value: 25 } },
+  { key: "fit_wt_intermediate", name: "Strength Forged", description: "Log 5 weight training sessions with progressive load increases", iconEmoji: "⚙️", xpReward: 100, tier: "silver", category: "fitness", criteria: { type: "weight_training_intermediate", value: 5 } },
   { key: "fit_wt_advanced", name: "Iron Sovereign", description: "Log 100 weight training sessions", iconEmoji: "👑", xpReward: 300, tier: "gold", category: "fitness", criteria: { type: "weight_training_sessions", value: 100 } },
   { key: "fit_wt_legendary", name: "Barbarian", description: "Log 200 weight training sessions", iconEmoji: "🔱", xpReward: 500, tier: "platinum", category: "fitness", criteria: { type: "weight_training_sessions", value: 200 } },
 
@@ -222,4 +222,5 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { key: "content_live_fifty", name: "Content Empire", description: "Complete 50 content pipelines to posted", iconEmoji: "👑", xpReward: 300, tier: "platinum", category: "content", criteria: { type: "content_live_posted", value: 50 } },
   { key: "content_live_blog_published", name: "Blog Publisher", description: "Complete the live pipeline for your first blog post", iconEmoji: "📝", xpReward: 20, tier: "bronze", category: "content", criteria: { type: "content_live_pipeline_blog", value: 1 } },
   { key: "content_live_video_published", name: "Video Producer", description: "Complete the live pipeline for your first video", iconEmoji: "🎥", xpReward: 20, tier: "bronze", category: "content", criteria: { type: "content_live_pipeline_video", value: 1 } },
+  { key: "content_live_post_published", name: "Post Publisher", description: "Complete the live pipeline for your first social post", iconEmoji: "📢", xpReward: 20, tier: "bronze", category: "content", criteria: { type: "content_live_pipeline_post", value: 1 } },
 ];

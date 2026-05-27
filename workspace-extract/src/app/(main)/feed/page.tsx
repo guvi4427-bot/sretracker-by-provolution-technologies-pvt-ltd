@@ -53,6 +53,7 @@ const LIVE_STATUS_PIPELINES: Record<string, { key: string; label: string; color:
   ],
   video: [
     { key: 'not_started', label: 'Not Started', color: 'text-muted-foreground bg-white/5', icon: Film },
+    { key: 'scripted', label: 'Scripted', color: 'text-purple-400 bg-purple-600/20', icon: PenTool },
     { key: 'shoot', label: 'Shoot', color: 'text-red-400 bg-red-600/20', icon: Video },
     { key: 'edit', label: 'Edit', color: 'text-amber-400 bg-amber-600/20', icon: Edit3 },
     { key: 'posted', label: 'Posted', color: 'text-green-400 bg-green-600/20', icon: ExternalLink },
@@ -109,6 +110,7 @@ export default function FeedPage() {
   const [feedWeightLogs, setFeedWeightLogs] = useState<any[]>([]);
   const [feedWorkouts, setFeedWorkouts] = useState<any[]>([]);
   const [feedContentEntries, setFeedContentEntries] = useState<any[]>([]);
+  const [feedLearningTopics, setFeedLearningTopics] = useState<any[]>([]);
 
   // Other users' live updates for Feed tab
   const [liveContentUpdates, setLiveContentUpdates] = useState<any[]>([]);
@@ -137,14 +139,16 @@ export default function FeedPage() {
   const fetchLiveData = useCallback(async () => {
     if (isGuest) return; // Guests can't access fitness/content APIs
     try {
-      const [wRes, wlRes, eRes] = await Promise.all([
+      const [wRes, wlRes, eRes, ltRes] = await Promise.all([
         fetch('/api/fitness/workout'),
         fetch('/api/fitness/weight'),
         fetch('/api/content/entries'),
+        fetch('/api/learning/topic'),
       ]);
       if (wRes.ok) { const d = await wRes.json(); setFeedWorkouts(Array.isArray(d) ? d : d.workouts || []); }
       if (wlRes.ok) { const d = await wlRes.json(); setFeedWeightLogs(Array.isArray(d) ? d : d.weightLogs || []); }
       if (eRes.ok) { const d = await eRes.json(); setFeedContentEntries(Array.isArray(d) ? d : d.entries || []); }
+      if (ltRes.ok) { const d = await ltRes.json(); setFeedLearningTopics(Array.isArray(d) ? d : d.topics || []); }
     } catch {}
   }, []);
 
@@ -999,9 +1003,30 @@ export default function FeedPage() {
               <p className="text-xs text-muted-foreground/50 text-center py-6">No fitness data yet. Log workouts or weight to see your trends here.</p>
             ) : (
               <div className="space-y-4">
-                {/* Weight Trend */}
+                {/* Weight Summary */}
+                {feedWeightLogs.length > 0 && (
+                  <div className="flex items-center gap-3 bg-accent/50 rounded-xl p-3">
+                    <Scale size={18} className="text-blue-400 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground/60">Latest Weight</p>
+                      <p className="text-lg font-bold text-foreground">{feedWeightLogs[feedWeightLogs.length - 1]?.weight} kg</p>
+                    </div>
+                    {feedWeightLogs.length >= 2 && (() => {
+                      const diff = feedWeightLogs[feedWeightLogs.length - 1]?.weight - feedWeightLogs[feedWeightLogs.length - 2]?.weight;
+                      return (
+                        <div className={`flex items-center gap-1 text-xs font-medium ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>
+                          <TrendingUp size={12} className={diff < 0 ? 'rotate-180' : ''} />
+                          {diff > 0 ? '+' : ''}{diff.toFixed(1)} kg
+                        </div>
+                      );
+                    })()}
+                    <span className="text-[10px] text-muted-foreground/50">{feedWeightLogs.length} entries</span>
+                  </div>
+                )}
+
+                {/* Weight Trend Chart */}
                 <AnimatePresence>
-                  {feedWeightChartData.length >= 1 && (
+                  {feedWeightChartData.length >= 2 && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1032,9 +1057,58 @@ export default function FeedPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Workout Summary */}
+                {feedWorkouts.length > 0 && (
+                  <div className="flex items-center gap-3 bg-accent/50 rounded-xl p-3">
+                    <Flame size={18} className="text-red-400 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground/60">Total Workouts</p>
+                      <p className="text-lg font-bold text-foreground">{feedWorkouts.length}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground/60">Total Calories</p>
+                      <p className="text-sm font-semibold text-amber-400">{feedWorkouts.reduce((sum: number, w: any) => sum + (w.estimatedCalories || 0), 0).toFixed(0)}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </GlassCard>
+
+          {/* Your Learning Live Status */}
+          {feedLearningTopics.length > 0 && (
+            <GlassCard className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-semibold text-foreground">Your Learning Status</h3>
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse ml-1" />
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {feedLearningTopics.map((topic: any) => (
+                  <div key={topic.id} className="bg-accent/50 rounded-xl p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <BookOpen size={14} className="text-cyan-400 shrink-0" />
+                        <p className="text-sm font-medium text-foreground truncate">{topic.name}</p>
+                      </div>
+                      {topic.phase && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 font-medium shrink-0">
+                          {topic.phase.charAt(0).toUpperCase() + topic.phase.slice(1)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] text-muted-foreground/50">{topic._count?.entries || topic.entryCount || 0} entries</span>
+                      {topic.isSharedCollection && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600/15 text-blue-300 font-medium">Shared</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          )}
 
           {/* Your Content Live Status */}
           <GlassCard className="p-4">
