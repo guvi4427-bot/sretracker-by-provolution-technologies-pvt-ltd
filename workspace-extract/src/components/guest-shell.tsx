@@ -15,7 +15,6 @@ import { Separator } from '@/components/ui/separator';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Logo } from '@/components/logo';
 import { GuestProvider, useGuest } from '@/components/guest-guard';
-import { AdCard } from '@/components/ad-banner';
 import { SITE_NAME } from '@/lib/site-config';
 import { useTheme } from 'next-themes';
 
@@ -175,11 +174,6 @@ function GuestShellInner({ children }: { children: React.ReactNode }) {
               <UserPlus size={14} className="mr-1" /> Sign Up
             </Button>
           </div>
-        </div>
-
-        {/* Ad Banner — bottom of page, above footer */}
-        <div className="mt-4">
-          <AdCard format="in-feed" slot="guest_bottom" />
         </div>
 
         {/* Footer Links */}
