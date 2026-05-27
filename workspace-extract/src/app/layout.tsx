@@ -7,6 +7,7 @@ import { CookieConsent } from "@/components/cookie-consent";
 import {
   SITE_NAME,
   SITE_URL,
+  CANONICAL_URL,
   SITE_SHORT_NAME,
   SITE_TAGLINE,
   SITE_DESCRIPTION,
@@ -43,13 +44,13 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(SITE_URL),
   alternates: {
-    canonical: SITE_URL,
+    canonical: CANONICAL_URL,
   },
   openGraph: {
     title: `${SITE_NAME} — Gamified Self-Growth Platform`,
     description: `${SITE_SHORT_NAME} (${SITE_TAGLINE}) — Your gamified journey to self-improvement. Track fitness, learning, and content creation with XP, achievements, and a progression-focused community.`,
     type: "website",
-    url: SITE_URL,
+    url: CANONICAL_URL,
     siteName: SITE_NAME,
     locale: "en_US",
     images: [

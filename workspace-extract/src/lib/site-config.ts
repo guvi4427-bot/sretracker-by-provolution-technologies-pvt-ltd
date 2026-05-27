@@ -13,6 +13,15 @@ export const SITE_NAME: string =
 export const SITE_URL: string =
   process.env.NEXT_PUBLIC_SITE_URL || "https://sretracker.vercel.app";
 
+/**
+ * Canonical URL — overrides the canonical pointer for SEO cross-domain
+ * canonicals.  Set NEXT_PUBLIC_CANONICAL_URL on Vercel to point this
+ * site's canonical to another domain (e.g. pid1 → pid2).
+ * Falls back to SITE_URL when not set.
+ */
+export const CANONICAL_URL: string =
+  process.env.NEXT_PUBLIC_CANONICAL_URL || SITE_URL;
+
 /** Short brand — "SRE" for both projects */
 export const SITE_SHORT_NAME = "SRE";
 
