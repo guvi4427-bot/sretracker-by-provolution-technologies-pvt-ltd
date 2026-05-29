@@ -347,7 +347,7 @@ export default function AIHubPage() {
             </ScrollArea>
           ) : (
             <ScrollArea className="h-full">
-              <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 space-y-4">
+              <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 space-y-4">
                 {messages.map((msg) => (
                   <motion.div
                     key={msg.id}
@@ -355,19 +355,18 @@ export default function AIHubPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15 }}
                     className={cn(
-                      'flex w-full',
+                      'flex w-full gap-2',
                       msg.role === 'user' ? 'justify-end' : 'justify-start'
                     )}
                   >
                     {msg.role === 'assistant' && (
-                      <div className={cn('w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 mr-1.5 sm:mr-2 mt-1', activeAgent.gradient)}>
-                        <ActiveIcon size={12} className="text-white sm:hidden" />
-                        <ActiveIcon size={13} className="text-white hidden sm:block" />
+                      <div className={cn('w-7 h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 mt-1', activeAgent.gradient)}>
+                        <ActiveIcon size={13} className="text-white" />
                       </div>
                     )}
                     <div
                       className={cn(
-                        'max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden',
+                        'max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-2.5 overflow-hidden',
                         msg.role === 'user'
                           ? 'gradient-blue text-white rounded-br-md'
                           : 'bg-accent/50 text-foreground rounded-bl-md border border-border'
@@ -385,8 +384,8 @@ export default function AIHubPage() {
                 ))}
 
                 {isLoading && (
-                  <div className="flex justify-start items-end">
-                    <div className={cn('w-7 h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 mr-2', activeAgent.gradient)}>
+                  <div className="flex justify-start items-end gap-2">
+                    <div className={cn('w-7 h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0', activeAgent.gradient)}>
                       <ActiveIcon size={13} className="text-white" />
                     </div>
                     <div className="bg-accent/50 rounded-2xl rounded-bl-md px-4 py-3 border border-border">

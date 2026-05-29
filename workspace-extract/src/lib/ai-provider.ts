@@ -2,78 +2,22 @@
 //
 // Provider: Pollinations AI
 //   Authentication: Bearer token via POLLINATIONS_API_KEY (sk_ key)
-//   Endpoint: https://text.pollinations.ai/openai (OpenAI-compatible)
-//   Fallback chain:
-//     Tier 1: Authenticated chat endpoint (POST, best quality)
-//     Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
-//     Tier 3: Text endpoint (GET, simplest, most reliable)
-//     Tier 4: Local fallback message (extreme failure only)
+//   Endpoint: https://text.pollinations.ai/openai/chat/completions (OpenAI-compatible)
+//   Model: openai (GPT-4o-mini via Pollinations)
 //
-// Features:
-//   - maxTokens = 4500
-//   - API key authentication via POLLINATIONS_API_KEY env var
-//   - Server-side only
-//   - Navigator bot: preloaded local responses (instant, no API call)
-//   - Telemetry: provider, latency, tokens, retry count, errors
+// No graceful degradation — direct Pollinations AI call with API key.
 
-const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
-const POLLINATIONS_TEXT = 'https://text.pollinations.ai/';
-
+const POLLINATIONS_CHAT_URL = 'https://text.pollinations.ai/openai/chat/completions';
 const MAX_TOKENS = 4500;
-const REQUEST_TIMEOUT_MS = 30000; // Slightly longer with auth
+const REQUEST_TIMEOUT_MS = 60000; // 60s for long responses
 
 // ── API Key ──
-function getApiKey(): string | null {
-  return process.env.POLLINATIONS_API_KEY || null;
-}
-
-// ── Telemetry Types ──
-export interface AITelemetry {
-  provider: string;
-  model: string;
-  latencyMs: number;
-  tokensIn?: number;
-  tokensOut?: number;
-  retryCount: number;
-  fallbackUsed: boolean;
-  success: boolean;
-  errorType?: string;
-  errorMessage?: string;
-  timestamp: string;
-}
-
-const telemetryStore: AITelemetry[] = [];
-const MAX_TELEMETRY = 100;
-
-function recordTelemetry(t: AITelemetry) {
-  telemetryStore.push(t);
-  if (telemetryStore.length > MAX_TELEMETRY) telemetryStore.shift();
-  console.log(`[AI] ${t.success ? 'OK' : 'FAIL'} provider=${t.provider}/${t.model} latency=${t.latencyMs}ms retries=${t.retryCount}${t.errorType ? ` error=${t.errorType}` : ''}`);
-}
-
-export function getTelemetry(): AITelemetry[] { return [...telemetryStore]; }
-
-export function getTelemetryStats() {
-  const total = telemetryStore.length || 1;
-  const successes = telemetryStore.filter(t => t.success).length;
-  const byProvider: Record<string, { count: number; successes: number; avgLatency: number }> = {};
-  for (const t of telemetryStore) {
-    const key = `${t.provider}/${t.model}`;
-    if (!byProvider[key]) byProvider[key] = { count: 0, successes: 0, avgLatency: 0 };
-    byProvider[key].count++;
-    if (t.success) byProvider[key].successes++;
-    byProvider[key].avgLatency += t.latencyMs;
+function getApiKey(): string {
+  const key = process.env.POLLINATIONS_API_KEY;
+  if (!key) {
+    console.error('[AI] POLLINATIONS_API_KEY env var is NOT set!');
   }
-  for (const k of Object.keys(byProvider)) {
-    byProvider[k].avgLatency = Math.round(byProvider[k].avgLatency / byProvider[k].count);
-  }
-  return {
-    totalCalls: total,
-    successRate: Math.round((successes / total) * 100),
-    fallbackRate: Math.round((telemetryStore.filter(t => t.fallbackUsed).length / total) * 100),
-    avgLatency: Math.round(telemetryStore.reduce((a, t) => a + t.latencyMs, 0) / total),
-    byProvider,
-  };
+  return key || '';
 }
 
 // ── Timeout Helper ──
@@ -87,110 +31,56 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
 }
 
 // ═══════════════════════════════════════════════════════
-// Pollinations OpenAI-compatible chat endpoint (Authenticated)
+// Pollinations Chat Completion (Authenticated)
 // ═══════════════════════════════════════════════════════
 async function pollinationsChat(
   messages: { role: string; content: string }[],
   maxTokens = MAX_TOKENS,
-): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
+): Promise<string | null> {
   const apiKey = getApiKey();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Add Authorization header if API key is available
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const res = await fetch(POLLINATIONS_OPENAI, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: 'openai',
-      messages,
-      max_tokens: maxTokens,
-      seed: 42,
+  const res = await withTimeout(
+    fetch(POLLINATIONS_CHAT_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: 'openai',
+        messages,
+        max_tokens: maxTokens,
+        seed: 42,
+      }),
     }),
-  });
+    REQUEST_TIMEOUT_MS,
+  );
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    console.error(`[AI] Pollinations responded ${res.status}: ${errText.slice(0, 300)}`);
     throw new Error(`Pollinations responded ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || null;
-  const usage = data?.usage;
-  return {
-    content,
-    tokensIn: usage?.prompt_tokens || 0,
-    tokensOut: usage?.completion_tokens || 0,
-  };
-}
 
-// ═══════════════════════════════════════════════════════
-// Pollinations text endpoint (GET, with auth if available)
-// ═══════════════════════════════════════════════════════
-async function pollinationsText(prompt: string): Promise<string | null> {
-  const apiKey = getApiKey();
-  const encoded = encodeURIComponent(prompt.slice(0, 2000));
-
-  const headers: Record<string, string> = {
-    'Accept': 'text/plain',
-  };
-
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
+  if (content) {
+    console.log(`[AI] OK model=openai tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+  } else {
+    console.error('[AI] Pollinations returned empty content:', JSON.stringify(data).slice(0, 300));
   }
 
-  const res = await fetch(`${POLLINATIONS_TEXT}${encoded}`, {
-    method: 'GET',
-    headers,
-  });
-  if (!res.ok) throw new Error(`Pollinations text responded ${res.status}`);
-  const text = await res.text();
-  return text?.trim() || null;
+  return content;
 }
-
-// ── Provider attempt with telemetry ──
-async function attemptProvider(
-  providerName: string,
-  modelName: string,
-  fn: () => Promise<string | null>,
-  retryCount: number,
-  fallbackUsed: boolean,
-): Promise<{ result: string | null; telemetry: AITelemetry }> {
-  const start = Date.now();
-  try {
-    const result = await withTimeout(fn(), REQUEST_TIMEOUT_MS);
-    const latencyMs = Date.now() - start;
-    const telemetry: AITelemetry = {
-      provider: providerName, model: modelName, latencyMs, retryCount, fallbackUsed,
-      success: !!result, timestamp: new Date().toISOString(),
-    };
-    recordTelemetry(telemetry);
-    return { result, telemetry };
-  } catch (e: any) {
-    const latencyMs = Date.now() - start;
-    const telemetry: AITelemetry = {
-      provider: providerName, model: modelName, latencyMs, retryCount, fallbackUsed,
-      success: false,
-      errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error',
-      errorMessage: e.message?.slice(0, 200),
-      timestamp: new Date().toISOString(),
-    };
-    recordTelemetry(telemetry);
-    return { result: null, telemetry };
-  }
-}
-
-// ── Local fallback error message ──
-const AI_UNAVAILABLE = 'We are experiencing technical difficulties please try again later';
 
 // ═══════════════════════════════════════════════════════
-// Public: Chat completion with 4-tier Pollinations fallback
+// Public: Chat completion
 // ═══════════════════════════════════════════════════════
 export async function aiChat(
   messages: { role: string; content: string }[],
@@ -202,44 +92,22 @@ export async function aiChat(
     ...messages,
   ];
 
-  const providers: Array<() => Promise<{ result: string | null; telemetry: AITelemetry }>> = [
-    // Tier 1: Full Pollinations chat (authenticated, best quality)
-    () => attemptProvider('pollinations', 'openai', async () => {
-      const r = await pollinationsChat(allMessages, maxTokens);
-      return r.content;
-    }, 0, false),
-    // Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
-    () => attemptProvider('pollinations', 'openai-lite', async () => {
-      const lastMessage = messages[messages.length - 1]?.content || '';
-      const liteMessages = systemPrompt
-        ? [{ role: 'system' as const, content: systemPrompt.slice(0, 500) }, { role: 'user' as const, content: lastMessage }]
-        : [{ role: 'user' as const, content: lastMessage }];
-      const r = await pollinationsChat(liteMessages, Math.min(maxTokens, 2000));
-      return r.content;
-    }, 1, true),
-    // Tier 3: Pollinations text endpoint (simplest, most reliable)
-    () => attemptProvider('pollinations', 'text', async () => {
-      const lastMessage = messages[messages.length - 1]?.content || '';
-      const prompt = systemPrompt
-        ? `${systemPrompt.slice(0, 300)}\n\nUser: ${lastMessage}`
-        : lastMessage;
-      return pollinationsText(prompt);
-    }, 2, true),
-  ];
-
-  // Try each provider in sequence
-  for (const providerFn of providers) {
-    try {
-      const { result } = await providerFn();
-      if (result) return result;
-    } catch {
-      // Continue to next provider
-    }
+  try {
+    const result = await pollinationsChat(allMessages, maxTokens);
+    if (result) return result;
+  } catch (e: any) {
+    console.error('[AI] aiChat failed:', e.message);
   }
 
-  // All providers failed — local fallback
-  console.error('[AI] All Pollinations tiers failed for aiChat');
-  return AI_UNAVAILABLE;
+  // Single retry on failure
+  try {
+    const result = await pollinationsChat(allMessages, maxTokens);
+    if (result) return result;
+  } catch (e: any) {
+    console.error('[AI] aiChat retry also failed:', e.message);
+  }
+
+  return 'I\'m having trouble connecting right now. Please try again in a moment.';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -255,40 +123,30 @@ export async function aiStructuredChat<T>(
     ...messages,
   ];
 
-  // Tier 1: Full chat — best at following JSON instructions
   try {
-    const start = Date.now();
-    const r = await withTimeout(pollinationsChat(allMessages, maxTokens));
-    const latencyMs = Date.now() - start;
-    if (r.content) {
-      const match = r.content.match(/\{[\s\S]*\}/);
+    const content = await pollinationsChat(allMessages, maxTokens);
+    if (content) {
+      const match = content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
-    recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: false, errorType: 'malformed_response', timestamp: new Date().toISOString() });
   } catch (e: any) {
-    recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs: 0, retryCount: 0, fallbackUsed: false, success: false, errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error', errorMessage: e.message?.slice(0, 200), timestamp: new Date().toISOString() });
+    console.error('[AI] aiStructuredChat failed:', e.message);
   }
 
-  // Tier 2: Lightweight retry
+  // Single retry
   try {
-    const start = Date.now();
-    const lastMessage = messages[messages.length - 1]?.content || '';
-    const liteMessages = systemPrompt
-      ? [{ role: 'system' as const, content: systemPrompt.slice(0, 300) }, { role: 'user' as const, content: lastMessage }]
-      : [{ role: 'user' as const, content: lastMessage }];
-    const r = await withTimeout(pollinationsChat(liteMessages, Math.min(maxTokens, 1000)));
-    const latencyMs = Date.now() - start;
-    if (r.content) {
-      const match = r.content.match(/\{[\s\S]*\}/);
+    const content = await pollinationsChat(allMessages, maxTokens);
+    if (content) {
+      const match = content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'pollinations', model: 'openai-lite-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 1, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
-  } catch { /* fall through */ }
+  } catch (e: any) {
+    console.error('[AI] aiStructuredChat retry failed:', e.message);
+  }
 
   return null;
 }
@@ -343,7 +201,7 @@ export async function aiClassifyTask(
     const result = await aiStructuredChat<{ category: string; productivity: string; suggestion?: string }>(
       [{ role: 'user', content: `Classify this task: "${title}". ${description || ''}` }],
       'You are a task classifier. Respond ONLY with valid JSON: {"category":"work|personal|health|learning|other","productivity":"productive|unproductive","suggestion":"short replacement tip if unproductive, omit if productive"}',
-      120
+      120,
     );
     if (result?.category) category = result.category;
     if (result?.productivity) productivity = result.productivity;
@@ -361,12 +219,12 @@ export async function generateTitle(userMessage: string): Promise<string> {
   const titleFromKeywords = extractTitle(userMessage);
   if (titleFromKeywords) return titleFromKeywords;
 
-  // Fallback: use AI to generate a title (short, cheap call)
+  // Use AI to generate a title (short, cheap call)
   try {
     const result = await aiStructuredChat<{ title: string }>(
       [{ role: 'user', content: `Generate a very short title (3-5 words max) for a conversation that starts with: "${userMessage.slice(0, 200)}"` }],
       'You generate conversation titles. Respond ONLY with valid JSON: {"title":"Short Title Here"}',
-      60
+      60,
     );
     if (result?.title) return result.title;
   } catch { /* fallback */ }
@@ -452,18 +310,20 @@ export async function aiQuickCall(
     { role: 'user', content: userPrompt },
   ];
 
-  // Try authenticated chat endpoint first
   try {
-    const r = await withTimeout(pollinationsChat(messages, maxTokens), 10000);
-    if (r.content) return r.content;
-  } catch {}
-
-  // Fallback to text endpoint
-  try {
-    const prompt = `${systemPrompt}\n\n${userPrompt}`;
-    const result = await withTimeout(pollinationsText(prompt), 10000);
+    const result = await pollinationsChat(messages, maxTokens);
     if (result) return result;
-  } catch {}
+  } catch (e: any) {
+    console.error('[AI] aiQuickCall failed:', e.message);
+  }
+
+  // Single retry
+  try {
+    const result = await pollinationsChat(messages, maxTokens);
+    if (result) return result;
+  } catch (e: any) {
+    console.error('[AI] aiQuickCall retry failed:', e.message);
+  }
 
   return null;
 }
