@@ -5,7 +5,7 @@ import { getToken } from "next-auth/jwt";
 // Paths that are always public (no auth required)
 const PUBLIC_PATHS = [
   "/", "/login", "/signup", "/landing", "/terms", "/privacy", "/about", "/contact",
-  "/community-guidelines", "/api/auth", "/api/health", "/_next",
+  "/community-guidelines", "/blog", "/api/auth", "/api/health", "/_next",
   "/favicon", "/favicon-96x96.png", "/favicon.ico", "/apple-touch-icon.png",
   "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
   "/manifest.webmanifest", "/site.webmanifest", "/public",
@@ -13,6 +13,22 @@ const PUBLIC_PATHS = [
   "/llms.txt", "/og-image.png",
   "/google990ef60d3a371354.html",
 ];
+
+// Known search/AI crawler user-agent substrings (lowercase match)
+const CRAWLER_USER_AGENTS = [
+  'googlebot', 'bingbot', 'yandexbot', 'baiduspider', 'duckduckbot',
+  'slurp', 'sogou', 'exabot', 'facebot', 'facebookexternalhit',
+  'twitterbot', 'linkedinbot', 'applebot', 'pingdom', 'dotbot',
+  'gptbot', 'chatgpt-user', 'claudebot', 'anthropic-ai', 'perplexitybot',
+  'bytespider', 'semrushbot', 'ahrefsbot', 'mj12bot', 'seznambot',
+  'bot/', 'crawler', 'spider', 'crawl',
+];
+
+function isCrawler(userAgent: string | null): boolean {
+  if (!userAgent) return false;
+  const ua = userAgent.toLowerCase();
+  return CRAWLER_USER_AGENTS.some(crawler => ua.includes(crawler));
+}
 
 // Paths that guests can browse (read-only, no interaction)
 const GUEST_ALLOWED_PATHS = [
@@ -68,6 +84,18 @@ export async function middleware(request: NextRequest) {
     const isGuest = request.cookies.get("sre_guest")?.value === "true";
 
     if (!token && !isGuest) {
+      // Allow known crawlers to access guest-allowed pages for SEO/indexing
+      if (isCrawler(request.headers.get('user-agent'))) {
+        const isCrawlerAllowedPath =
+          GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) ||
+          pathname.startsWith("/profile/") ||
+          pathname.startsWith("/shared-topic/");
+        if (isCrawlerAllowedPath) {
+          const response = NextResponse.next();
+          response.headers.set("x-guest", "true");
+          return response;
+        }
+      }
       // Not authenticated and not a guest — redirect to intro landing page
       const landingUrl = new URL("/", request.url);
       return NextResponse.redirect(landingUrl);

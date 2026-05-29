@@ -53,40 +53,56 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
   const [chatQuery, setChatQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  if (!shareData) return null;
+  // Reset state when dialog closes
+  const handleClose = () => {
+    setError(null);
+    setActiveSection('actions');
+    onClose();
+  };
 
   const getShareUrl = (data: ShareData): string => {
     if (typeof window === 'undefined') return '';
-    const origin = window.location.origin;
-    switch (data.type) {
-      case 'post':
-        return `${origin}/feed?post=${data.id}`;
-      case 'learning_update':
-        return `${origin}/shared-topic/${data.id}?from=share`;
-      case 'content_update':
-        return `${origin}/discover?q=%23content`;
-      case 'fitness_update':
-        return `${origin}/discover?q=%23fitness`;
-      default:
-        return `${origin}/shared-topic/${data.id}?from=share`;
+    try {
+      const origin = window.location.origin;
+      switch (data.type) {
+        case 'post':
+          return `${origin}/feed?post=${data.id}`;
+        case 'learning_update':
+          return `${origin}/shared-topic/${data.id}?from=share`;
+        case 'content_update':
+          return `${origin}/discover?q=%23content`;
+        case 'fitness_update':
+          return `${origin}/discover?q=%23fitness`;
+        default:
+          return `${origin}/shared-topic/${data.id}?from=share`;
+      }
+    } catch {
+      return '';
     }
   };
 
-  const shareUrl = getShareUrl(shareData);
-
-  const shareMessage = `Shared: ${shareData.preview}\n\n${shareUrl}`;
+  // Safe defaults when shareData is null/undefined
+  const safeShareData = shareData || { type: 'post' as const, id: '', preview: '' };
+  const shareUrl = getShareUrl(safeShareData);
+  const shareMessage = `Shared: ${safeShareData.preview || 'Item'}\n\n${shareUrl}`;
 
   // Fetch conversations when user clicks "Share to Chat"
   useEffect(() => {
     if (activeSection === 'chats' && conversations.length === 0) {
       setLoadingTargets(true);
+      setError(null);
       fetch('/api/messages')
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+          if (!r.ok) throw new Error('Failed to load chats');
+          return r.json();
+        })
         .then(data => {
           const convs = Array.isArray(data?.conversations) ? data.conversations : [];
           setConversations(convs);
         })
-        .catch(() => {})
+        .catch((err) => {
+          setError(err?.message || 'Could not load your chats. Please try again.');
+        })
         .finally(() => setLoadingTargets(false));
     }
   }, [activeSection]);
@@ -95,13 +111,19 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
   useEffect(() => {
     if (activeSection === 'groups' && groups.length === 0) {
       setLoadingTargets(true);
+      setError(null);
       fetch('/api/groups')
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+          if (!r.ok) throw new Error('Failed to load groups');
+          return r.json();
+        })
         .then(data => {
           const grps = Array.isArray(data?.groups) ? data.groups : [];
           setGroups(grps);
         })
-        .catch(() => {})
+        .catch((err) => {
+          setError(err?.message || 'Could not load your groups. Please try again.');
+        })
         .finally(() => setLoadingTargets(false));
     }
   }, [activeSection]);
@@ -119,6 +141,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
 
   async function shareToDM(receiverId: string) {
     setSharing(true);
+    setError(null);
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -130,14 +153,17 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
       });
       if (res.ok) {
         toast.success('Shared to chat!');
-        onClose();
-        setActiveSection('actions');
+        handleClose();
       } else {
         const d = await res.json().catch(() => ({}));
-        toast.error(d.error || 'Failed to share');
+        const errMsg = d.error || 'Failed to share to chat';
+        setError(errMsg);
+        toast.error(errMsg);
       }
     } catch {
-      toast.error('Failed to share');
+      const errMsg = 'Network error. Please check your connection and try again.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setSharing(false);
     }
@@ -145,6 +171,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
 
   async function shareToGroupChat(groupId: string) {
     setSharing(true);
+    setError(null);
     try {
       const res = await fetch(`/api/groups/${groupId}/messages`, {
         method: 'POST',
@@ -153,14 +180,17 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
       });
       if (res.ok) {
         toast.success('Shared to group!');
-        onClose();
-        setActiveSection('actions');
+        handleClose();
       } else {
         const d = await res.json().catch(() => ({}));
-        toast.error(d.error || 'Failed to share to group');
+        const errMsg = d.error || 'Failed to share to group';
+        setError(errMsg);
+        toast.error(errMsg);
       }
     } catch {
-      toast.error('Failed to share to group');
+      const errMsg = 'Network error. Please check your connection and try again.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setSharing(false);
     }
@@ -171,7 +201,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
     content_update: 'Content Update',
     fitness_update: 'Fitness Update',
     learning_update: 'Learning Topic',
-  }[shareData.type] || 'Item';
+  }[safeShareData.type] || 'Item';
 
   // Filter conversations by search query
   const filteredConversations = chatQuery.trim()
@@ -186,7 +216,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
     : groups;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setActiveSection('actions'); } }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { handleClose(); } }}>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -195,7 +225,11 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
           </DialogTitle>
         </DialogHeader>
 
-        {error ? (
+        {!shareData ? (
+          <div className="py-4 text-center">
+            <p className="text-sm text-muted-foreground">No item selected to share</p>
+          </div>
+        ) : error ? (
           <div className="space-y-4">
             <div className="bg-destructive/10 rounded-lg p-4 text-center">
               <p className="text-sm text-destructive font-medium">Something went wrong</p>
@@ -214,23 +248,24 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
           {/* Preview */}
           <div className="bg-accent/50 rounded-lg p-3">
             <p className="text-xs text-muted-foreground mb-1">
-              {shareData.userName ? `by ${shareData.userName}` : ''}
+              {safeShareData.userName ? `by ${safeShareData.userName}` : ''}
             </p>
             <p className="text-sm text-foreground line-clamp-3">
-              {shareData.preview}
+              {safeShareData.preview}
             </p>
           </div>
 
           {/* Share URL - fixed overflow with proper containment */}
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0 overflow-hidden">
-              <p className="truncate">{shareUrl}</p>
+              <p className="truncate break-all">{shareUrl || 'Generating link...'}</p>
             </div>
             <Button
               size="sm"
               variant="outline"
               onClick={copyLink}
               className="shrink-0"
+              disabled={!shareUrl}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
             </Button>
