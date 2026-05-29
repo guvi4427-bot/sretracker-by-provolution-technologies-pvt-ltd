@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { message, botType, conversationId } = await req.json();
+    const { message, botType, conversationId, history } = await req.json();
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
 
     const userId = session.user.id;
@@ -88,6 +88,7 @@ SRE Platform Sections you can guide users to:
 - **Messages** (/messages) — Direct messages and group chats
 - **Friends** (/friends) — Your friends list
 - **Onboarding** (/onboarding) — Set up your phases and interests if not completed
+- **AI Hub** (/ai-hub) — Unified AI chat center with all AI assistants and chat history
 
 Platform Concepts:
 - **Phases**: Start (begin something new), Restart (return to paused goals), Explore (discover new interests)
@@ -115,54 +116,64 @@ You can help with:
 
     const selectedPrompt = systemPrompts[agentType] || systemPrompts.general;
 
-    // ── Load or create conversation ──
+    // ── Load or create conversation (fully isolated try/catch) ──
+    // This MUST NOT break AI responses even if DB tables are missing
     let conversation: any = null;
     let contextMessages: { role: string; content: string }[] = [];
 
-    if (conversationId) {
-      // Load existing conversation
-      conversation = await db.conversation.findUnique({
-        where: { id: conversationId },
-        include: {
-          messages: {
-            orderBy: { createdAt: 'desc' },
-            take: 30, // Last 15 exchanges (30 messages)
+    try {
+      if (conversationId) {
+        // Load existing conversation
+        conversation = await db.conversation.findUnique({
+          where: { id: conversationId },
+          include: {
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 30, // Last 15 exchanges (30 messages)
+            },
           },
-        },
-      });
+        });
 
-      if (conversation && conversation.userId === userId) {
-        // Reverse to get chronological order (oldest first)
-        contextMessages = [...conversation.messages].reverse().map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        if (conversation && conversation.userId === userId) {
+          // Reverse to get chronological order (oldest first)
+          contextMessages = [...conversation.messages].reverse().map((m: any) => ({
+            role: m.role,
+            content: m.content,
+          }));
+        }
       }
-    }
 
-    // If no conversation found, check for recent conversation within 30 min
-    if (!conversation) {
-      const recentConv = await db.conversation.findFirst({
-        where: {
-          userId,
-          aiAgentType: agentType,
-          updatedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-        },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          messages: {
-            orderBy: { createdAt: 'desc' },
-            take: 30,
+      // If no conversation found, check for recent conversation within 30 min
+      if (!conversation) {
+        const recentConv = await db.conversation.findFirst({
+          where: {
+            userId,
+            aiAgentType: agentType,
+            updatedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
           },
-        },
-      });
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 30,
+            },
+          },
+        });
 
-      if (recentConv) {
-        conversation = recentConv;
-        contextMessages = [...recentConv.messages].reverse().map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        if (recentConv) {
+          conversation = recentConv;
+          contextMessages = [...recentConv.messages].reverse().map((m: any) => ({
+            role: m.role,
+            content: m.content,
+          }));
+        }
+      }
+    } catch (dbLoadError) {
+      // DB tables may not exist yet — continue without conversation context
+      console.log('[AI Chatbot] DB conversation load failed (tables may not exist):', dbLoadError instanceof Error ? dbLoadError.message : 'unknown');
+      // If client sent history, use it as fallback context
+      if (Array.isArray(history) && history.length > 0) {
+        contextMessages = history.slice(-30);
       }
     }
 
@@ -172,10 +183,12 @@ You can help with:
       { role: 'user', content: message },
     ];
 
+    // ── Call AI — this is the critical path, must always work ──
     const reply = await aiChat(messages, selectedPrompt);
 
-    // ── Save conversation ──
-    let savedConversationId = conversationId;
+    // ── Save conversation (fully isolated try/catch) ──
+    // This MUST NOT break the AI response even if DB save fails
+    let savedConversationId = conversationId || null;
 
     try {
       if (conversation) {
@@ -220,9 +233,9 @@ You can help with:
         });
         savedConversationId = newConv.id;
       }
-    } catch (dbError) {
-      console.error('Conversation save error:', dbError);
-      // Fallback: try saving to legacy ChatHistory
+    } catch (dbSaveError) {
+      // DB save failed — try legacy ChatHistory as fallback
+      console.log('[AI Chatbot] DB conversation save failed, trying legacy:', dbSaveError instanceof Error ? dbSaveError.message : 'unknown');
       try {
         const existingChat = await db.chatHistory.findFirst({
           where: { userId, botType: agentType },
@@ -255,7 +268,8 @@ You can help with:
           savedConversationId = savedConversationId || newChat.id;
         }
       } catch (legacyError) {
-        console.error('Legacy chat history save error:', legacyError);
+        // Even legacy save failed — AI response is still returned to user
+        console.error('[AI Chatbot] Legacy chat history save also failed:', legacyError instanceof Error ? legacyError.message : 'unknown');
       }
     }
 
