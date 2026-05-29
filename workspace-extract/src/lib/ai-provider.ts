@@ -1,24 +1,24 @@
-// ── AI Provider — Multi-tier Provider Chain with Graceful Degradation ──
+// ── AI Provider — Graceful Degradation with Real API Keys ──
 //
-// Provider Priority (free, no-key-first):
-//   Tier 1: Pollinations GPT-4o (free, no key, no rate limit)
-//   Tier 2: Pollinations Mistral (free, no key)
-//   Tier 3: Lightweight prompt retry (shorter messages)
-//   Tier 4: Pollinations text endpoint (simplest, always works)
-//   Tier 5: z-ai (DISABLED — npm import crashes site)
+// Provider Priority (fast & reliable first):
+//   Tier 1: Google Gemini (fast, generous free tier)
+//   Tier 2: OpenAI ChatGPT (reliable, high quality)
+//   Tier 3: OpenRouter (multi-model gateway)
+//   Tier 4: Local fallback message (extreme failure only)
 //
 // Features:
-//   - maxTokens = 8000 (was 500 → 5000 → 25000 caused failures, 8000 is safe & generous)
-//   - Retry logic: current provider → lightweight prompt → backup provider → emergency
+//   - maxTokens = 4500 (safe limit that works across all providers)
+//   - Server-side only — API keys never exposed to client
 //   - Telemetry: provider, latency, tokens, retry count, errors
-//   - No hardcoded "I'm having trouble" fallbacks — retries instead
-//   - Structured logging for admin analytics
+//   - Navigator bot: preloaded local responses (instant, no API call)
 
-const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
-const POLLINATIONS_TEXT   = 'https://text.pollinations.ai/';
+const MAX_TOKENS = 4500;
+const REQUEST_TIMEOUT_MS = 20000; // 20s per provider attempt
 
-const REQUEST_TIMEOUT_MS = 25000;
-const MAX_TOKENS = 8000; // 25000 caused Pollinations failures; 8000 is safe & allows detailed responses
+// ── API Keys (server-side env vars only) ──
+function getGeminiKey(): string | null { return process.env.GEMINI_API_KEY || null; }
+function getOpenAIKey(): string | null { return process.env.OPENAI_API_KEY || null; }
+function getOpenRouterKey(): string | null { return process.env.OPENROUTER_API_KEY || null; }
 
 // ── Telemetry Types ──
 export interface AITelemetry {
@@ -35,7 +35,6 @@ export interface AITelemetry {
   timestamp: string;
 }
 
-// In-memory telemetry store (last 100 calls) for admin analytics
 const telemetryStore: AITelemetry[] = [];
 const MAX_TELEMETRY = 100;
 
@@ -45,15 +44,12 @@ function recordTelemetry(t: AITelemetry) {
   console.log(`[AI] ${t.success ? 'OK' : 'FAIL'} provider=${t.provider}/${t.model} latency=${t.latencyMs}ms retries=${t.retryCount}${t.errorType ? ` error=${t.errorType}` : ''}`);
 }
 
-export function getTelemetry(): AITelemetry[] {
-  return [...telemetryStore];
-}
+export function getTelemetry(): AITelemetry[] { return [...telemetryStore]; }
 
 export function getTelemetryStats() {
   const total = telemetryStore.length || 1;
   const successes = telemetryStore.filter(t => t.success).length;
   const byProvider: Record<string, { count: number; successes: number; avgLatency: number }> = {};
-
   for (const t of telemetryStore) {
     const key = `${t.provider}/${t.model}`;
     if (!byProvider[key]) byProvider[key] = { count: 0, successes: 0, avgLatency: 0 };
@@ -64,7 +60,6 @@ export function getTelemetryStats() {
   for (const k of Object.keys(byProvider)) {
     byProvider[k].avgLatency = Math.round(byProvider[k].avgLatency / byProvider[k].count);
   }
-
   return {
     totalCalls: total,
     successRate: Math.round((successes / total) * 100),
@@ -84,61 +79,135 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
   ]);
 }
 
-// ── Tier 1 & 2: OpenAI-compatible endpoint with model fallback ──
-async function pollinationsChat(
+// ═══════════════════════════════════════════════════════
+// Tier 1: Google Gemini
+// ═══════════════════════════════════════════════════════
+async function geminiChat(
   messages: { role: string; content: string }[],
-  model: 'openai' | 'mistral' = 'openai',
-  maxTokens = MAX_TOKENS
+  maxTokens = MAX_TOKENS,
 ): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
-  const res = await fetch(POLLINATIONS_OPENAI, {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  // Convert OpenAI-style messages to Gemini format
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7,
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini responded ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    || data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('')
+    || null;
+  const usage = data?.usageMetadata;
+  return {
+    content,
+    tokensIn: usage?.promptTokenCount || 0,
+    tokensOut: usage?.candidatesTokenCount || 0,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+// Tier 2: OpenAI ChatGPT
+// ═══════════════════════════════════════════════════════
+async function openaiChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) throw new Error('OpenAI API key not configured');
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
     body: JSON.stringify({
-      model,
+      model: 'gpt-4o-mini',
       messages,
       max_tokens: maxTokens,
-      seed: 42,
+      temperature: 0.7,
     }),
   });
 
-  if (!res.ok) throw new Error(`Pollinations ${model} responded ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OpenAI responded ${res.status}: ${errText.slice(0, 200)}`);
+  }
 
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = data?.choices?.[0]?.message?.content || null;
   const usage = data?.usage;
   return {
-    content: content || null,
+    content,
     tokensIn: usage?.prompt_tokens || 0,
     tokensOut: usage?.completion_tokens || 0,
   };
 }
 
-// ── Tier 3: Simple text endpoint ──
-async function pollinationsText(prompt: string): Promise<string | null> {
-  const encoded = encodeURIComponent(prompt.slice(0, 2000));
-  const res = await fetch(`${POLLINATIONS_TEXT}${encoded}`, {
-    method: 'GET',
-    headers: { 'Accept': 'text/plain' },
+// ═══════════════════════════════════════════════════════
+// Tier 3: OpenRouter
+// ═══════════════════════════════════════════════════════
+async function openrouterChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) throw new Error('OpenRouter API key not configured');
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://sre-growth-platform.vercel.app',
+      'X-Title': 'SRE Growth Platform',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.0-flash-001',
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
   });
-  if (!res.ok) throw new Error(`Pollinations text responded ${res.status}`);
-  const text = await res.text();
-  return text?.trim() || null;
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OpenRouter responded ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || null;
+  const usage = data?.usage;
+  return {
+    content,
+    tokensIn: usage?.prompt_tokens || 0,
+    tokensOut: usage?.completion_tokens || 0,
+  };
 }
 
-// ── Tier 5: z-ai-web-dev-sdk ──
-// NOTE: Importing z-ai-web-dev-sdk as npm package CRASHES the entire site.
-// If z.ai is needed, use fetch() to call the API endpoint directly.
-// For now, Tier 4 (Pollinations text) is the last resort.
-async function zaiChat(
-  _messages: { role: string; content: string }[],
-  _systemPrompt?: string,
-): Promise<string | null> {
-  // DISABLED: z-ai-web-dev-sdk import crashes the site
-  // Re-enable only via fetch-based API call, never via npm import
-  return null;
-}
-
-// ── Provider Attempt with Telemetry ──
+// ── Provider attempt with telemetry ──
 async function attemptProvider(
   providerName: string,
   modelName: string,
@@ -151,26 +220,17 @@ async function attemptProvider(
     const result = await withTimeout(fn(), REQUEST_TIMEOUT_MS);
     const latencyMs = Date.now() - start;
     const telemetry: AITelemetry = {
-      provider: providerName,
-      model: modelName,
-      latencyMs,
-      retryCount,
-      fallbackUsed,
-      success: !!result,
-      timestamp: new Date().toISOString(),
+      provider: providerName, model: modelName, latencyMs, retryCount, fallbackUsed,
+      success: !!result, timestamp: new Date().toISOString(),
     };
     recordTelemetry(telemetry);
     return { result, telemetry };
   } catch (e: any) {
     const latencyMs = Date.now() - start;
     const telemetry: AITelemetry = {
-      provider: providerName,
-      model: modelName,
-      latencyMs,
-      retryCount,
-      fallbackUsed,
+      provider: providerName, model: modelName, latencyMs, retryCount, fallbackUsed,
       success: false,
-      errorType: e.message?.includes('Timeout') ? 'timeout' : e.message?.includes('rate') ? 'rate_limit' : 'provider_error',
+      errorType: e.message?.includes('Timeout') ? 'timeout' : e.message?.includes('key') ? 'config' : 'provider_error',
       errorMessage: e.message?.slice(0, 200),
       timestamp: new Date().toISOString(),
     };
@@ -179,12 +239,16 @@ async function attemptProvider(
   }
 }
 
-// ── Public: Chat completion with retry chain ──
-// Used by: chatbot, rate-day, script-review, estimate-burn, all AI features
+// ── Local fallback error message ──
+const AI_UNAVAILABLE = 'We are experiencing technical difficulties please try again later';
+
+// ═══════════════════════════════════════════════════════
+// Public: Chat completion with Gemini → ChatGPT → OpenRouter → fallback
+// ═══════════════════════════════════════════════════════
 export async function aiChat(
   messages: { role: string; content: string }[],
   systemPrompt?: string,
-  maxTokens = MAX_TOKENS
+  maxTokens = MAX_TOKENS,
 ): Promise<string> {
   const allMessages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
@@ -192,35 +256,21 @@ export async function aiChat(
   ];
 
   const providers: Array<() => Promise<{ result: string | null; telemetry: AITelemetry }>> = [
-    // Tier 1: Pollinations GPT-4o
-    () => attemptProvider('pollinations', 'gpt-4o', async () => {
-      const r = await pollinationsChat(allMessages, 'openai', maxTokens);
+    // Tier 1: Gemini (fast, generous free tier)
+    () => attemptProvider('google', 'gemini-2.0-flash', async () => {
+      const r = await geminiChat(allMessages, maxTokens);
       return r.content;
     }, 0, false),
-    // Tier 2: Pollinations Mistral
-    () => attemptProvider('pollinations', 'mistral', async () => {
-      const r = await pollinationsChat(allMessages, 'mistral', maxTokens);
+    // Tier 2: OpenAI ChatGPT (reliable, high quality)
+    () => attemptProvider('openai', 'gpt-4o-mini', async () => {
+      const r = await openaiChat(allMessages, maxTokens);
       return r.content;
     }, 1, true),
-    // Tier 3: Lightweight prompt retry (shorter messages)
-    () => attemptProvider('pollinations', 'gpt-4o-lite', async () => {
-      const lastMessage = messages[messages.length - 1]?.content || '';
-      const liteMessages = systemPrompt
-        ? [{ role: 'system' as const, content: systemPrompt.slice(0, 500) }, { role: 'user' as const, content: lastMessage }]
-        : [{ role: 'user' as const, content: lastMessage }];
-      const r = await pollinationsChat(liteMessages, 'openai', Math.min(maxTokens, 2000));
+    // Tier 3: OpenRouter (multi-model gateway)
+    () => attemptProvider('openrouter', 'gemini-2.0-flash', async () => {
+      const r = await openrouterChat(allMessages, maxTokens);
       return r.content;
     }, 2, true),
-    // Tier 4: Pollinations text endpoint
-    () => attemptProvider('pollinations', 'text', async () => {
-      const lastMessage = messages[messages.length - 1]?.content || '';
-      const prompt = systemPrompt
-        ? `${systemPrompt}\n\nUser: ${lastMessage}`
-        : lastMessage;
-      return pollinationsText(prompt);
-    }, 3, true),
-    // Tier 5: z-ai (disabled — npm import crashes site; use fetch if needed)
-    // Skipped entirely to avoid z-ai-web-dev-sdk import crash
   ];
 
   // Try each provider in sequence
@@ -233,49 +283,64 @@ export async function aiChat(
     }
   }
 
-  // All providers failed — return graceful error (not hardcoded fake AI response)
+  // All providers failed
   console.error('[AI] All providers failed for aiChat');
-  return 'I apologize, but I\'m experiencing technical difficulties connecting to my AI services right now. Please try again in a few moments — your message was received and I want to help.';
+  return AI_UNAVAILABLE;
 }
 
-// ── Public: Structured JSON chat ──
-// Used by: estimate-macros, classify-task, script-review
+// ═══════════════════════════════════════════════════════
+// Public: Structured JSON chat
+// ═══════════════════════════════════════════════════════
 export async function aiStructuredChat<T>(
   messages: { role: string; content: string }[],
   systemPrompt?: string,
-  maxTokens = 8000
+  maxTokens = 4500,
 ): Promise<T | null> {
   const allMessages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
     ...messages,
   ];
 
-  // Tier 1: GPT-4o — best at following JSON instructions
+  // Tier 1: Gemini
   try {
     const start = Date.now();
-    const r = await withTimeout(pollinationsChat(allMessages, 'openai', maxTokens));
+    const r = await withTimeout(geminiChat(allMessages, maxTokens));
     const latencyMs = Date.now() - start;
     if (r.content) {
       const match = r.content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'pollinations', model: 'gpt-4o-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: true, timestamp: new Date().toISOString() });
+        recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
-    recordTelemetry({ provider: 'pollinations', model: 'gpt-4o-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: false, errorType: 'malformed_response', timestamp: new Date().toISOString() });
+    recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: false, errorType: 'malformed_response', timestamp: new Date().toISOString() });
   } catch (e: any) {
-    recordTelemetry({ provider: 'pollinations', model: 'gpt-4o-structured', latencyMs: 0, retryCount: 0, fallbackUsed: false, success: false, errorType: 'timeout', errorMessage: e.message?.slice(0, 200), timestamp: new Date().toISOString() });
+    recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs: 0, retryCount: 0, fallbackUsed: false, success: false, errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error', errorMessage: e.message?.slice(0, 200), timestamp: new Date().toISOString() });
   }
 
-  // Tier 2: Mistral
+  // Tier 2: OpenAI
   try {
     const start = Date.now();
-    const r = await withTimeout(pollinationsChat(allMessages, 'mistral', maxTokens));
+    const r = await withTimeout(openaiChat(allMessages, maxTokens));
     const latencyMs = Date.now() - start;
     if (r.content) {
       const match = r.content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'pollinations', model: 'mistral-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 1, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
+        recordTelemetry({ provider: 'openai', model: 'gpt-4o-mini-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 1, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
+        return JSON.parse(match[0]) as T;
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Tier 3: OpenRouter
+  try {
+    const start = Date.now();
+    const r = await withTimeout(openrouterChat(allMessages, maxTokens));
+    const latencyMs = Date.now() - start;
+    if (r.content) {
+      const match = r.content.match(/\{[\s\S]*\}/);
+      if (match) {
+        recordTelemetry({ provider: 'openrouter', model: 'gemini-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 2, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
@@ -284,8 +349,9 @@ export async function aiStructuredChat<T>(
   return null;
 }
 
-// ── Public: Task classifier ──
-// Used by: classify-task route
+// ═══════════════════════════════════════════════════════
+// Public: Task classifier
+// ═══════════════════════════════════════════════════════
 export async function aiClassifyTask(
   title: string,
   description?: string
@@ -341,4 +407,127 @@ export async function aiClassifyTask(
   } catch { /* keyword result already computed above */ }
 
   return { category, productivity, suggestion };
+}
+
+// ═══════════════════════════════════════════════════════
+// Public: Title generation for conversations
+// ═══════════════════════════════════════════════════════
+export async function generateTitle(userMessage: string): Promise<string> {
+  // First try a keyword-based approach (instant, no API call)
+  const titleFromKeywords = extractTitle(userMessage);
+  if (titleFromKeywords) return titleFromKeywords;
+
+  // Fallback: use AI to generate a title (short, cheap call)
+  try {
+    const result = await aiStructuredChat<{ title: string }>(
+      [{ role: 'user', content: `Generate a very short title (3-5 words max) for a conversation that starts with: "${userMessage.slice(0, 200)}"` }],
+      'You generate conversation titles. Respond ONLY with valid JSON: {"title":"Short Title Here"}',
+      60
+    );
+    if (result?.title) return result.title;
+  } catch { /* fallback */ }
+
+  // Final fallback: use first 50 chars of user message
+  return userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : '');
+}
+
+function extractTitle(message: string): string | null {
+  const lower = message.toLowerCase();
+  const patterns: [RegExp, (...args: string[]) => string][] = [
+    [/roadmap\s+(?:to\s+)?(?:learn\s+)?(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/help\s+me\s+(?:learn|study|understand)\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/how\s+(?:to|do\s+I)\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/what\s+is\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/explain\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/create\s+(?:a\s+)?(.+)(?:\s+plan|schedule|routine)/i, (_: string, m: string) => capitalize(m.trim()) + ' Plan'],
+    [/create\s+(?:a\s+)?(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/build\s+(?:a\s+)?(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/plan\s+(?:for\s+)?(.+)/i, (_: string, m: string) => capitalize(m.trim()) + ' Plan'],
+    [/suggest\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+    [/recommend\s+(.+)/i, (_: string, m: string) => capitalize(m.trim())],
+  ];
+
+  for (const [regex, formatter] of patterns) {
+    const match = lower.match(regex);
+    if (match) {
+      const title = formatter(match[0], match[1]);
+      if (title && title.length > 2 && title.length < 60) return title;
+    }
+  }
+  return null;
+}
+
+function capitalize(str: string): string {
+  return str.replace(/\b\w/g, c => c.toUpperCase()).replace(/\s+/g, ' ').trim();
+}
+
+// ═══════════════════════════════════════════════════════
+// Public: Navigator Bot — Preloaded local responses (instant, no API)
+// ═══════════════════════════════════════════════════════
+export function getNavigatorResponse(userMessage: string): string | null {
+  const msg = userMessage.toLowerCase().trim();
+
+  // Navigation patterns with responses
+  const navPatterns: [RegExp, string][] = [
+    // Pages
+    [/workout|exercise|gym|fitness log/i, 'You can log workouts and track fitness in the **Fitness** section! Go to **/fitness** to:\n- Log workouts with duration and type\n- Track meals and nutrition\n- View progress charts\n- Get AI macro and calorie burn estimates'],
+    [/learn|study|track.*learn|learning/i, 'Track your learning in the **Learn** section at **/learn**! You can:\n- Create learning topics\n- Log study entries with time spent\n- Track progress with charts\n- Share topics with others'],
+    [/achievements?|badge|trophy/i, 'View your achievements at **/achievements**! The SRE platform has 100+ badges across learning, fitness, time, and content. Badges range from bronze to platinum based on your milestones.'],
+    [/content|script|series|post|publish/i, 'Content creation tools are in the **Content** section at **/content**! You can:\n- Manage content series\n- Track pipeline stages (idea → drafting → editing → published)\n- Get AI script reviews\n- Find best posting times'],
+    [/task|todo|productivity|focus|time manage/i, 'Manage tasks and focus in the **Time** section at **/time**! Features include:\n- Create tasks with priorities\n- Focus timer (Pomodoro-style)\n- Day planner with AI rating\n- Task classification (productive/unproductive)'],
+    [/dashboard|home|overview|summary/i, 'Your personalized dashboard is at **/home** — it shows your activity summary, stats, quick actions, and recent progress across all areas.'],
+    [/analytics|chart|stats|data|progress/i, 'Visual dashboards are at **/analytics**! View charts for learning progress, fitness trends, and focus data across different time periods.'],
+    [/profile|account|settings|preferences/i, 'Access your profile at **/profile** and settings at **/settings**. Your profile shows stats, achievements, and activity. Settings has account preferences.'],
+    [/social|feed|follow|discover|community/i, 'Social features include:\n- **/feed** — See posts from people you follow\n- **/discover** — Find new users and content\n- **/leaderboard** — Community XP rankings'],
+    [/message|chat|dm|friend/i, 'Communication features:\n- **/messages** — Direct messages and group chats\n- **/friends** — Your friends list\n- **/notifications** — Activity notifications'],
+    [/ai|assistant|hub|chat/i, 'The **AI Hub** at **/ai-hub** is your unified AI chat center! Choose from 6 specialized assistants:\n- Main Assistant (general)\n- Learning Tutor\n- Fitness Coach\n- Productivity Coach\n- Content Assistant\n- Platform Navigator'],
+    [/phase|start|restart|explore|onboard/i, 'SRE uses a **Phase system**:\n- **Start** — Begin something new\n- **Restart** — Return to paused goals\n- **Explore** — Discover new interests\n\nVisit **/onboarding** to set up your phases and interests.'],
+    [/xp|level|rank|point/i, 'The **XP System** rewards every activity! Earn XP for logging workouts, studying, creating content, and more. Level up with increasing thresholds. Check your rank at **/leaderboard**.'],
+    [/streak|daily|consecutive|quest/i, 'Track **Streaks** for consecutive active days and complete **Daily Quests** for bonus XP! Both appear on your dashboard at **/home**.'],
+    [/navigate|how.*find|where.*go|where.*is|how.*use|help.*use/i, 'I can help you navigate! The SRE platform has these main sections:\n\n- **/home** — Dashboard\n- **/learn** — Learning tracker\n- **/fitness** — Fitness & nutrition\n- **/content** — Content creation\n- **/time** — Tasks & focus\n- **/ai-hub** — AI assistants\n- **/analytics** — Data dashboards\n- **/achievements** — Badges\n\nWhat would you like to find?'],
+    [/hello|hi|hey|greet/i, 'Hello! I\'m the SRE Navigator, your guide to the platform. Ask me anything about where to find features, how to use tools, or what each section does!'],
+    [/thank|thanks/i, 'You\'re welcome! If you need any more help navigating the SRE platform, just ask. I\'m always here to help!'],
+  ];
+
+  for (const [pattern, response] of navPatterns) {
+    if (pattern.test(msg)) return response;
+  }
+
+  // No match — return null to let the AI API handle it
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════
+// Public: Quick AI call for estimate-macros and estimate-burn
+// Uses the same Gemini → ChatGPT → OpenRouter chain
+// ═══════════════════════════════════════════════════════
+export async function aiQuickCall(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 100,
+): Promise<string | null> {
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+
+  // Try Gemini first
+  try {
+    const r = await withTimeout(geminiChat(messages, maxTokens), 5000);
+    if (r.content) return r.content;
+  } catch {}
+
+  // Try OpenAI
+  try {
+    const r = await withTimeout(openaiChat(messages, maxTokens), 5000);
+    if (r.content) return r.content;
+  } catch {}
+
+  // Try OpenRouter
+  try {
+    const r = await withTimeout(openrouterChat(messages, maxTokens), 5000);
+    if (r.content) return r.content;
+  } catch {}
+
+  return null;
 }

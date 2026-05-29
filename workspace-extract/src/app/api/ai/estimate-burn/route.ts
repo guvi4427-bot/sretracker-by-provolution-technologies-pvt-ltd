@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { aiQuickCall } from '@/lib/ai-provider';
 
 const BURN_ESTIMATES: Record<string, number> = {
   running: 11, walking: 4, cycling: 8, swimming: 10,
@@ -12,32 +13,18 @@ const BURN_ESTIMATES: Record<string, number> = {
   planks: 4, burpees: 10,
 };
 
-// ── AI call with hard 3s timeout ──
+// ── AI call using provider chain (Gemini → ChatGPT → OpenRouter) ──
 async function fetchAIBurn(
   workoutType: string, duration: number
 ): Promise<{ estimatedCalories: number; reasoning: string } | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
-
   try {
-    const res = await fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: 'openai',
-        messages: [
-          { role: 'system', content: 'You are a fitness AI. Return only valid JSON.' },
-          { role: 'user', content: `Calories burned for ${workoutType} for ${duration} minutes, average 70kg person. Return ONLY JSON: {"estimatedCalories":number,"reasoning":"one short sentence"}` },
-        ],
-        max_tokens: 60,
-        seed: 42,
-      }),
-    });
+    const content = await aiQuickCall(
+      'You are a fitness AI. Return only valid JSON.',
+      `Calories burned for ${workoutType} for ${duration} minutes, average 70kg person. Return ONLY JSON: {"estimatedCalories":number,"reasoning":"one short sentence"}`,
+      60,
+    );
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content || '';
+    if (!content) return null;
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
@@ -45,8 +32,6 @@ async function fetchAIBurn(
     return parsed;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

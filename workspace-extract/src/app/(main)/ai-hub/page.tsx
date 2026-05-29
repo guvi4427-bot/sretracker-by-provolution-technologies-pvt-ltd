@@ -347,7 +347,7 @@ export default function AIHubPage() {
             </ScrollArea>
           ) : (
             <ScrollArea className="h-full">
-              <div className="max-w-3xl mx-auto p-4 space-y-4">
+              <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 space-y-4">
                 {messages.map((msg) => (
                   <motion.div
                     key={msg.id}
@@ -355,27 +355,30 @@ export default function AIHubPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15 }}
                     className={cn(
-                      'flex',
+                      'flex w-full',
                       msg.role === 'user' ? 'justify-end' : 'justify-start'
                     )}
                   >
                     {msg.role === 'assistant' && (
-                      <div className={cn('w-7 h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 mr-2 mt-1', activeAgent.gradient)}>
-                        <ActiveIcon size={13} className="text-white" />
+                      <div className={cn('w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 mr-1.5 sm:mr-2 mt-1', activeAgent.gradient)}>
+                        <ActiveIcon size={12} className="text-white sm:hidden" />
+                        <ActiveIcon size={13} className="text-white hidden sm:block" />
                       </div>
                     )}
                     <div
                       className={cn(
-                        'max-w-[80%] rounded-2xl px-4 py-2.5',
+                        'max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden',
                         msg.role === 'user'
                           ? 'gradient-blue text-white rounded-br-md'
                           : 'bg-accent/50 text-foreground rounded-bl-md border border-border'
                       )}
                     >
                       {msg.role === 'assistant' ? (
-                        <AIMessage content={msg.content} />
+                        <div className="min-w-0 w-full overflow-hidden">
+                          <AIMessage content={msg.content} />
+                        </div>
                       ) : (
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                        <p className="text-sm leading-relaxed break-words">{msg.content}</p>
                       )}
                     </div>
                   </motion.div>

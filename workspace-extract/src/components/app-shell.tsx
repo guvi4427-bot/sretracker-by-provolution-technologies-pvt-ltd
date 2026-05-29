@@ -492,7 +492,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           ) : (
             /* ── Chat Panel ── */
             <>
-              <ScrollArea className="flex-1 p-4">
+              <ScrollArea className="flex-1 p-3">
                 {chatMessages.length === 0 ? (
                   <div className="text-center text-muted-foreground py-8">
                     <Compass className="w-8 h-8 mx-auto mb-2" />
@@ -507,14 +507,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 ) : (
                   <div className="space-y-3">
                     {chatMessages.map((msg, i) => (
-                      <div key={i} className={`flex items-end ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div key={i} className={`flex items-start w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         {msg.role === 'assistant' && (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 mt-0.5 shadow-md shadow-violet-500/20">
                             <Compass size={11} className="text-white" />
                           </div>
                         )}
-                        <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'gradient-blue text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>
-                          {msg.role === 'assistant' ? <AIMessage content={msg.content} /> : msg.content}
+                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm overflow-hidden ${msg.role === 'user' ? 'gradient-blue text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>
+                          {msg.role === 'assistant' ? <div className="min-w-0 w-full overflow-hidden"><AIMessage content={msg.content} /></div> : <span className="break-words">{msg.content}</span>}
                         </div>
                       </div>
                     ))}

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { aiChat, generateTitle } from '@/lib/ai-provider';
+import { aiChat, generateTitle, getNavigatorResponse } from '@/lib/ai-provider';
 import { db } from '@/lib/db';
 
 export async function POST(req: Request) {
@@ -184,7 +184,20 @@ You can help with:
     ];
 
     // ── Call AI — this is the critical path, must always work ──
-    const reply = await aiChat(messages, selectedPrompt);
+    let reply: string;
+
+    // Navigator bot: try instant local response first
+    if (agentType === 'navigation') {
+      const localReply = getNavigatorResponse(message);
+      if (localReply) {
+        reply = localReply;
+      } else {
+        // No local match — fall through to AI API with navigation prompt
+        reply = await aiChat(messages, selectedPrompt);
+      }
+    } else {
+      reply = await aiChat(messages, selectedPrompt);
+    }
 
     // ── Save conversation (fully isolated try/catch) ──
     // This MUST NOT break the AI response even if DB save fails

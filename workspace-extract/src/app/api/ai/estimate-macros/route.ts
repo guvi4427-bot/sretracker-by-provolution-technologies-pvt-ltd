@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { FOOD_DATABASE, UNIT_TO_GRAMS } from '@/lib/constants';
+import { aiQuickCall } from '@/lib/ai-provider';
 
 // ── Unit conversion ──
 function convertToGrams(mealName: string, quantity: number, unit: string): number {
@@ -61,35 +62,20 @@ function computeDbMacros(match: typeof FOOD_DATABASE[number], grams: number) {
   };
 }
 
-// ── AI call with hard 3s timeout ──
-// Uses Pollinations directly — no ZAI SDK, no hanging
+// ── AI call using provider chain (Gemini → ChatGPT → OpenRouter) ──
 async function fetchAIMacros(
   mealName: string, quantity: number, unit: string, grams: number
 ): Promise<{ calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number } | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000); // hard 3s cap
-
   try {
     const prompt = `Estimate macros for: ${mealName}, quantity: ${quantity} ${unit} (~${Math.round(grams)}g). Return ONLY JSON: {"calories":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number}. Calculate for the EXACT quantity given.`;
 
-    const res = await fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: 'openai',
-        messages: [
-          { role: 'system', content: 'You are a nutrition database. Return only valid JSON macros for the exact quantity specified.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 100,
-        seed: 42,
-      }),
-    });
+    const content = await aiQuickCall(
+      'You are a nutrition database. Return only valid JSON macros for the exact quantity specified.',
+      prompt,
+      100,
+    );
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content || '';
+    if (!content) return null;
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
@@ -97,8 +83,6 @@ async function fetchAIMacros(
     return parsed;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
