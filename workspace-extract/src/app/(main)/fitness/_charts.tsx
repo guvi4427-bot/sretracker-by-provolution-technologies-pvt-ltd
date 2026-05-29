@@ -91,29 +91,27 @@ export function WorkoutChart({ data }: { data: WorkoutData[] }) {
 export function WeightChart({ data }: { data: { date: string; weight: number }[] }) {
   if (!data || data.length === 0) return null;
 
-  // Pad to at least 2 points so recharts draws a visible line/dot
-  const chartData = data.length === 1
-    ? [data[0], { ...data[0] }]
-    : data;
+  // Ensure at least 2 points so recharts renders a visible line
+  const chartData = data.length === 1 ? [data[0], { ...data[0] }] : data;
 
-  // Compute Y domain with padding so the line is never flush against top/bottom
-  const weights = chartData.map(d => d.weight).filter(Boolean);
+  // Fixed Y domain with padding — prevents collapse when all values are identical
+  const weights = chartData.map(d => Number(d.weight)).filter(v => !isNaN(v));
   const minW = Math.min(...weights);
   const maxW = Math.max(...weights);
-  const padding = Math.max(1, (maxW - minW) * 0.2);
-  const yMin = Math.floor(minW - padding);
-  const yMax = Math.ceil(maxW + padding);
+  const pad = Math.max(2, (maxW - minW) * 0.25);
+  const yMin = Math.floor(minW - pad);
+  const yMax = Math.ceil(maxW + pad);
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis
             dataKey="date"
             tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
             tickLine={false}
-            axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+            axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
             interval="preserveStartEnd"
           />
           <YAxis
@@ -122,19 +120,16 @@ export function WeightChart({ data }: { data: { date: string; weight: number }[]
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => `${v}kg`}
-            width={42}
+            width={40}
           />
-          <Tooltip
-            content={<CustomTooltip />}
-            cursor={{ stroke: 'rgba(59,130,246,0.3)', strokeWidth: 1 }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Line
             type="monotone"
             dataKey="weight"
             name="Weight (kg)"
             stroke="#3B82F6"
             strokeWidth={2.5}
-            dot={{ r: 4, fill: '#3B82F6', strokeWidth: 2, stroke: '#1d4ed8' }}
+            dot={{ r: 4, fill: '#3B82F6', stroke: '#1d4ed8', strokeWidth: 2 }}
             activeDot={{ r: 6, fill: '#60a5fa', stroke: '#3B82F6', strokeWidth: 2 }}
             connectNulls
           />

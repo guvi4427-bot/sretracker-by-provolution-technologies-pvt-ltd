@@ -68,9 +68,9 @@ export async function middleware(request: NextRequest) {
     const isGuest = request.cookies.get("sre_guest")?.value === "true";
 
     if (!token && !isGuest) {
-      // Not authenticated and not a guest — redirect to login
-      const loginUrl = new URL("/login", request.url);
-      return NextResponse.redirect(loginUrl);
+      // Not authenticated and not a guest — redirect to intro landing page
+      const landingUrl = new URL("/", request.url);
+      return NextResponse.redirect(landingUrl);
     }
 
     if (!token && isGuest) {
@@ -85,8 +85,8 @@ export async function middleware(request: NextRequest) {
 
       // Block guest access to restricted paths
       if (!isGuestAllowedPath && !isGuestAllowedApi) {
-        const loginUrl = new URL("/login", request.url);
-        return NextResponse.redirect(loginUrl);
+        const landingUrl = new URL("/", request.url);
+        return NextResponse.redirect(landingUrl);
       }
 
       // Guest accessing allowed path — inject guest header for API-level checks
