@@ -1,24 +1,23 @@
-// ── AI Provider — Graceful Degradation with Real API Keys ──
+// ── AI Provider — Pollinations AI (Free, No Key Required) ──
 //
-// Provider Priority (fast & reliable first):
-//   Tier 1: Google Gemini (fast, generous free tier)
-//   Tier 2: OpenAI ChatGPT (reliable, high quality)
-//   Tier 3: OpenRouter (multi-model gateway)
+// Provider: Pollinations AI
+//   Tier 1: OpenAI-compatible chat endpoint (POST, best quality)
+//   Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
+//   Tier 3: Text endpoint (GET, simplest, most reliable)
 //   Tier 4: Local fallback message (extreme failure only)
 //
 // Features:
-//   - maxTokens = 4500 (safe limit that works across all providers)
-//   - Server-side only — API keys never exposed to client
-//   - Telemetry: provider, latency, tokens, retry count, errors
+//   - maxTokens = 4500
+//   - Free, no API key required
+//   - Server-side only
 //   - Navigator bot: preloaded local responses (instant, no API call)
+//   - Telemetry: provider, latency, tokens, retry count, errors
+
+const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
+const POLLINATIONS_TEXT = 'https://text.pollinations.ai/';
 
 const MAX_TOKENS = 4500;
-const REQUEST_TIMEOUT_MS = 20000; // 20s per provider attempt
-
-// ── API Keys (server-side env vars only) ──
-function getGeminiKey(): string | null { return process.env.GEMINI_API_KEY || null; }
-function getOpenAIKey(): string | null { return process.env.OPENAI_API_KEY || null; }
-function getOpenRouterKey(): string | null { return process.env.OPENROUTER_API_KEY || null; }
+const REQUEST_TIMEOUT_MS = 25000;
 
 // ── Telemetry Types ──
 export interface AITelemetry {
@@ -80,80 +79,26 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
 }
 
 // ═══════════════════════════════════════════════════════
-// Tier 1: Google Gemini
+// Pollinations OpenAI-compatible chat endpoint
 // ═══════════════════════════════════════════════════════
-async function geminiChat(
+async function pollinationsChat(
   messages: { role: string; content: string }[],
   maxTokens = MAX_TOKENS,
 ): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error('Gemini API key not configured');
-
-  // Convert OpenAI-style messages to Gemini format
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.7,
-        },
-      }),
-    },
-  );
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini responded ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    || data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('')
-    || null;
-  const usage = data?.usageMetadata;
-  return {
-    content,
-    tokensIn: usage?.promptTokenCount || 0,
-    tokensOut: usage?.candidatesTokenCount || 0,
-  };
-}
-
-// ═══════════════════════════════════════════════════════
-// Tier 2: OpenAI ChatGPT
-// ═══════════════════════════════════════════════════════
-async function openaiChat(
-  messages: { role: string; content: string }[],
-  maxTokens = MAX_TOKENS,
-): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
-  const apiKey = getOpenAIKey();
-  if (!apiKey) throw new Error('OpenAI API key not configured');
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(POLLINATIONS_OPENAI, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'openai',
       messages,
       max_tokens: maxTokens,
-      temperature: 0.7,
+      seed: 42,
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`OpenAI responded ${res.status}: ${errText.slice(0, 200)}`);
+    throw new Error(`Pollinations responded ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
@@ -167,44 +112,17 @@ async function openaiChat(
 }
 
 // ═══════════════════════════════════════════════════════
-// Tier 3: OpenRouter
+// Pollinations text endpoint (GET, simplest, most reliable)
 // ═══════════════════════════════════════════════════════
-async function openrouterChat(
-  messages: { role: string; content: string }[],
-  maxTokens = MAX_TOKENS,
-): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
-  const apiKey = getOpenRouterKey();
-  if (!apiKey) throw new Error('OpenRouter API key not configured');
-
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://sre-growth-platform.vercel.app',
-      'X-Title': 'SRE Growth Platform',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.0-flash-001',
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
+async function pollinationsText(prompt: string): Promise<string | null> {
+  const encoded = encodeURIComponent(prompt.slice(0, 2000));
+  const res = await fetch(`${POLLINATIONS_TEXT}${encoded}`, {
+    method: 'GET',
+    headers: { 'Accept': 'text/plain' },
   });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`OpenRouter responded ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content || null;
-  const usage = data?.usage;
-  return {
-    content,
-    tokensIn: usage?.prompt_tokens || 0,
-    tokensOut: usage?.completion_tokens || 0,
-  };
+  if (!res.ok) throw new Error(`Pollinations text responded ${res.status}`);
+  const text = await res.text();
+  return text?.trim() || null;
 }
 
 // ── Provider attempt with telemetry ──
@@ -230,7 +148,7 @@ async function attemptProvider(
     const telemetry: AITelemetry = {
       provider: providerName, model: modelName, latencyMs, retryCount, fallbackUsed,
       success: false,
-      errorType: e.message?.includes('Timeout') ? 'timeout' : e.message?.includes('key') ? 'config' : 'provider_error',
+      errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error',
       errorMessage: e.message?.slice(0, 200),
       timestamp: new Date().toISOString(),
     };
@@ -243,7 +161,7 @@ async function attemptProvider(
 const AI_UNAVAILABLE = 'We are experiencing technical difficulties please try again later';
 
 // ═══════════════════════════════════════════════════════
-// Public: Chat completion with Gemini → ChatGPT → OpenRouter → fallback
+// Public: Chat completion with 4-tier Pollinations fallback
 // ═══════════════════════════════════════════════════════
 export async function aiChat(
   messages: { role: string; content: string }[],
@@ -256,20 +174,27 @@ export async function aiChat(
   ];
 
   const providers: Array<() => Promise<{ result: string | null; telemetry: AITelemetry }>> = [
-    // Tier 1: Gemini (fast, generous free tier)
-    () => attemptProvider('google', 'gemini-2.0-flash', async () => {
-      const r = await geminiChat(allMessages, maxTokens);
+    // Tier 1: Full Pollinations chat (best quality)
+    () => attemptProvider('pollinations', 'openai', async () => {
+      const r = await pollinationsChat(allMessages, maxTokens);
       return r.content;
     }, 0, false),
-    // Tier 2: OpenAI ChatGPT (reliable, high quality)
-    () => attemptProvider('openai', 'gpt-4o-mini', async () => {
-      const r = await openaiChat(allMessages, maxTokens);
+    // Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
+    () => attemptProvider('pollinations', 'openai-lite', async () => {
+      const lastMessage = messages[messages.length - 1]?.content || '';
+      const liteMessages = systemPrompt
+        ? [{ role: 'system' as const, content: systemPrompt.slice(0, 500) }, { role: 'user' as const, content: lastMessage }]
+        : [{ role: 'user' as const, content: lastMessage }];
+      const r = await pollinationsChat(liteMessages, Math.min(maxTokens, 2000));
       return r.content;
     }, 1, true),
-    // Tier 3: OpenRouter (multi-model gateway)
-    () => attemptProvider('openrouter', 'gemini-2.0-flash', async () => {
-      const r = await openrouterChat(allMessages, maxTokens);
-      return r.content;
+    // Tier 3: Pollinations text endpoint (simplest, most reliable)
+    () => attemptProvider('pollinations', 'text', async () => {
+      const lastMessage = messages[messages.length - 1]?.content || '';
+      const prompt = systemPrompt
+        ? `${systemPrompt.slice(0, 300)}\n\nUser: ${lastMessage}`
+        : lastMessage;
+      return pollinationsText(prompt);
     }, 2, true),
   ];
 
@@ -283,8 +208,8 @@ export async function aiChat(
     }
   }
 
-  // All providers failed
-  console.error('[AI] All providers failed for aiChat');
+  // All providers failed — local fallback
+  console.error('[AI] All Pollinations tiers failed for aiChat');
   return AI_UNAVAILABLE;
 }
 
@@ -301,46 +226,36 @@ export async function aiStructuredChat<T>(
     ...messages,
   ];
 
-  // Tier 1: Gemini
+  // Tier 1: Full chat — best at following JSON instructions
   try {
     const start = Date.now();
-    const r = await withTimeout(geminiChat(allMessages, maxTokens));
+    const r = await withTimeout(pollinationsChat(allMessages, maxTokens));
     const latencyMs = Date.now() - start;
     if (r.content) {
       const match = r.content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: true, timestamp: new Date().toISOString() });
+        recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
-    recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: false, errorType: 'malformed_response', timestamp: new Date().toISOString() });
+    recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 0, fallbackUsed: false, success: false, errorType: 'malformed_response', timestamp: new Date().toISOString() });
   } catch (e: any) {
-    recordTelemetry({ provider: 'google', model: 'gemini-2.0-flash-structured', latencyMs: 0, retryCount: 0, fallbackUsed: false, success: false, errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error', errorMessage: e.message?.slice(0, 200), timestamp: new Date().toISOString() });
+    recordTelemetry({ provider: 'pollinations', model: 'openai-structured', latencyMs: 0, retryCount: 0, fallbackUsed: false, success: false, errorType: e.message?.includes('Timeout') ? 'timeout' : 'provider_error', errorMessage: e.message?.slice(0, 200), timestamp: new Date().toISOString() });
   }
 
-  // Tier 2: OpenAI
+  // Tier 2: Lightweight retry
   try {
     const start = Date.now();
-    const r = await withTimeout(openaiChat(allMessages, maxTokens));
+    const lastMessage = messages[messages.length - 1]?.content || '';
+    const liteMessages = systemPrompt
+      ? [{ role: 'system' as const, content: systemPrompt.slice(0, 300) }, { role: 'user' as const, content: lastMessage }]
+      : [{ role: 'user' as const, content: lastMessage }];
+    const r = await withTimeout(pollinationsChat(liteMessages, Math.min(maxTokens, 1000)));
     const latencyMs = Date.now() - start;
     if (r.content) {
       const match = r.content.match(/\{[\s\S]*\}/);
       if (match) {
-        recordTelemetry({ provider: 'openai', model: 'gpt-4o-mini-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 1, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
-        return JSON.parse(match[0]) as T;
-      }
-    }
-  } catch { /* fall through */ }
-
-  // Tier 3: OpenRouter
-  try {
-    const start = Date.now();
-    const r = await withTimeout(openrouterChat(allMessages, maxTokens));
-    const latencyMs = Date.now() - start;
-    if (r.content) {
-      const match = r.content.match(/\{[\s\S]*\}/);
-      if (match) {
-        recordTelemetry({ provider: 'openrouter', model: 'gemini-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 2, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
+        recordTelemetry({ provider: 'pollinations', model: 'openai-lite-structured', latencyMs, tokensIn: r.tokensIn, tokensOut: r.tokensOut, retryCount: 1, fallbackUsed: true, success: true, timestamp: new Date().toISOString() });
         return JSON.parse(match[0]) as T;
       }
     }
@@ -467,9 +382,7 @@ function capitalize(str: string): string {
 export function getNavigatorResponse(userMessage: string): string | null {
   const msg = userMessage.toLowerCase().trim();
 
-  // Navigation patterns with responses
   const navPatterns: [RegExp, string][] = [
-    // Pages
     [/workout|exercise|gym|fitness log/i, 'You can log workouts and track fitness in the **Fitness** section! Go to **/fitness** to:\n- Log workouts with duration and type\n- Track meals and nutrition\n- View progress charts\n- Get AI macro and calorie burn estimates'],
     [/learn|study|track.*learn|learning/i, 'Track your learning in the **Learn** section at **/learn**! You can:\n- Create learning topics\n- Log study entries with time spent\n- Track progress with charts\n- Share topics with others'],
     [/achievements?|badge|trophy/i, 'View your achievements at **/achievements**! The SRE platform has 100+ badges across learning, fitness, time, and content. Badges range from bronze to platinum based on your milestones.'],
@@ -499,7 +412,6 @@ export function getNavigatorResponse(userMessage: string): string | null {
 
 // ═══════════════════════════════════════════════════════
 // Public: Quick AI call for estimate-macros and estimate-burn
-// Uses the same Gemini → ChatGPT → OpenRouter chain
 // ═══════════════════════════════════════════════════════
 export async function aiQuickCall(
   systemPrompt: string,
@@ -511,22 +423,17 @@ export async function aiQuickCall(
     { role: 'user', content: userPrompt },
   ];
 
-  // Try Gemini first
+  // Try OpenAI endpoint first
   try {
-    const r = await withTimeout(geminiChat(messages, maxTokens), 5000);
+    const r = await withTimeout(pollinationsChat(messages, maxTokens), 8000);
     if (r.content) return r.content;
   } catch {}
 
-  // Try OpenAI
+  // Fallback to text endpoint
   try {
-    const r = await withTimeout(openaiChat(messages, maxTokens), 5000);
-    if (r.content) return r.content;
-  } catch {}
-
-  // Try OpenRouter
-  try {
-    const r = await withTimeout(openrouterChat(messages, maxTokens), 5000);
-    if (r.content) return r.content;
+    const prompt = `${systemPrompt}\n\n${userPrompt}`;
+    const result = await withTimeout(pollinationsText(prompt), 8000);
+    if (result) return result;
   } catch {}
 
   return null;
