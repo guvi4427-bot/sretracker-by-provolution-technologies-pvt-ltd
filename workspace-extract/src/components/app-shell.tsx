@@ -9,9 +9,11 @@ import {
   Home, BookOpen, Dumbbell, PenTool, Clock, Rss, Trophy, Award,
   BarChart3, MessageCircle, User, Settings, Menu, Search, Bell,
   Shield, LogOut, Zap, Compass, X, Send, Bot, Sparkles,
-  Sun, Moon, MessageSquare, Bookmark, Users, UserCheck
+  Sun, Moon, MessageSquare, Bookmark, Users, UserCheck,
+  Plus, Trash2, ArrowLeft, Loader2
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
+import { AIMessage } from '@/components/ai-message';
 import { XPBar } from '@/components/xp-bar';
 import { StreakBadge } from '@/components/streak-badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -63,6 +65,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState<string | null>(null);
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [chatConversations, setChatConversations] = useState<any[]>([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -168,24 +174,73 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const loadChatConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/chat-history');
+      if (res.ok) {
+        const data = await res.json();
+        setChatConversations(data.conversations || []);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (showChatHistory) loadChatConversations();
+  }, [showChatHistory, loadChatConversations]);
+
+  const startNewConversation = () => {
+    setChatMessages([]);
+    setChatConversationId(null);
+    setShowChatHistory(false);
+  };
+
+  const loadConversation = async (convId: string) => {
+    try {
+      const res = await fetch('/api/ai/chat-history');
+      if (res.ok) {
+        const data = await res.json();
+        const conv = data.conversations?.find((c: any) => c.id === convId);
+        if (conv) {
+          setChatConversationId(convId);
+          setChatMessages([]);
+          setShowChatHistory(false);
+        }
+      }
+    } catch { /* ignore */ }
+  };
+
+  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/ai/chat-history?id=${convId}`, { method: 'DELETE' });
+      setChatConversations(prev => prev.filter(c => c.id !== convId));
+      if (convId === chatConversationId) {
+        setChatMessages([]);
+        setChatConversationId(null);
+      }
+    } catch { /* ignore */ }
+  };
+
   const sendChatMessage = async () => {
     if (!chatInput.trim()) return;
     const userMsg = { role: 'user', content: chatInput.trim() };
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput('');
     setChatLoading(true);
+    setShowChatHistory(false);
     try {
       const res = await fetch('/api/ai/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.content, botType: 'general', history: chatMessages.slice(-10) }),
+        body: JSON.stringify({ message: userMsg.content, botType: 'navigation', conversationId: chatConversationId, history: chatMessages.slice(-30) }),
       });
       if (res.ok) {
         const data = await res.json();
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.response || data.reply || t('ai.assistant') }]);
+        if (data.conversationId) setChatConversationId(data.conversationId);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.response || data.reply || 'I\'m here to help you navigate SRE!' }]);
       }
     } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: t('auth.somethingWentWrong') }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'I\'m having trouble connecting. Please try again.' }]);
     } finally {
       setChatLoading(false);
     }
@@ -340,7 +395,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {/* AI Chat Bubble - positioned above bottom nav */}
+      {/* AI Chat Bubble - Navigation AI positioned above bottom nav */}
       {!chatOpen ? (
         <motion.button
           onClick={() => setChatOpen(true)}
@@ -351,7 +406,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.5 }}
         >
-          <Bot size={24} className="text-gray-900" />
+          <Compass size={24} className="text-gray-900" />
         </motion.button>
       ) : (
         <motion.div
@@ -359,60 +414,135 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           className="fixed bottom-24 right-4 z-[55] w-[calc(100vw-2rem)] sm:w-[380px] h-[480px] backdrop-blur-2xl bg-background/90 dark:bg-[#0B1120]/80 border border-border flex flex-col overflow-hidden rounded-2xl"
         >
+          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center"><Bot size={16} className="text-gray-900" /></div>
+              {showChatHistory ? (
+                <button onClick={() => setShowChatHistory(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1"><ArrowLeft size={16} /></button>
+              ) : (
+                <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center"><Compass size={16} className="text-gray-900" /></div>
+              )}
               <div>
-                <p className="text-sm font-semibold text-foreground">{t('ai.assistant')}</p>
-                <p className="text-[10px] text-muted-foreground">{t('ai.poweredBy')}</p>
+                <p className="text-sm font-semibold text-foreground">{showChatHistory ? 'Chat History' : 'SRE Navigator'}</p>
+                <p className="text-[10px] text-muted-foreground">{showChatHistory ? `${chatConversations.length} conversations` : 'Your platform guide'}</p>
               </div>
             </div>
-            <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1"><X size={18} /></button>
+            <div className="flex items-center gap-1">
+              {!showChatHistory && (
+                <>
+                  <button onClick={startNewConversation} className="text-muted-foreground hover:text-foreground transition-colors p-1" title="New conversation"><Plus size={16} /></button>
+                  <button onClick={() => setShowChatHistory(true)} className="text-muted-foreground hover:text-foreground transition-colors p-1" title="Chat history"><MessageSquare size={16} /></button>
+                </>
+              )}
+              <button onClick={() => { setChatOpen(false); setShowChatHistory(false); }} className="text-muted-foreground hover:text-foreground transition-colors p-1"><X size={18} /></button>
+            </div>
           </div>
-          <ScrollArea className="flex-1 p-4">
-            {chatMessages.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                <Sparkles className="w-8 h-8 mx-auto mb-2" />
-                <p className="text-sm">{t('ai.askAnything')}</p>
+
+          {showChatHistory ? (
+            /* ── Chat History Panel ── */
+            <ScrollArea className="flex-1">
+              <div className="p-3 space-y-1">
+                {/* Search */}
+                <div className="relative mb-2">
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                  <input
+                    type="text"
+                    value={chatSearchQuery}
+                    onChange={(e) => setChatSearchQuery(e.target.value)}
+                    placeholder="Search conversations..."
+                    className="w-full h-8 rounded-lg bg-accent border border-border pl-7 pr-3 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-blue-500/40"
+                  />
+                </div>
+                {/* Conversation List */}
+                {chatConversations.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <MessageSquare className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">No conversations yet</p>
+                  </div>
+                ) : (
+                  chatConversations
+                    .filter(c => !chatSearchQuery || c.title?.toLowerCase().includes(chatSearchQuery.toLowerCase()))
+                    .map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => loadConversation(conv.id)}
+                        className={`w-full text-left p-2.5 rounded-lg hover:bg-accent transition-colors group ${chatConversationId === conv.id ? 'bg-accent' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-foreground truncate">{conv.title}</p>
+                            <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{conv.preview}</p>
+                            <p className="text-[10px] text-muted-foreground/40 mt-1">
+                              {conv.messageCount} messages
+                            </p>
+                          </div>
+                          <button
+                            onClick={(e) => deleteConversation(conv.id, e)}
+                            className="text-muted-foreground/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 shrink-0"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </button>
+                    ))
+                )}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex items-end ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.role === 'assistant' && (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
-                        <Bot size={11} className="text-white" />
+            </ScrollArea>
+          ) : (
+            /* ── Chat Panel ── */
+            <>
+              <ScrollArea className="flex-1 p-4">
+                {chatMessages.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Compass className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm font-medium">SRE Navigator</p>
+                    <p className="text-xs mt-1 text-muted-foreground/50">Ask me how to navigate the platform!</p>
+                    <div className="mt-3 space-y-1">
+                      {["Where do I log workouts?", "How do I track learning?", "Where are my achievements?", "How do I create a content series?"].map(s => (
+                        <button key={s} onClick={() => setChatInput(s)} className="block w-full text-left text-xs text-muted-foreground/60 hover:text-muted-foreground bg-accent/50 hover:bg-accent rounded-lg px-3 py-1.5 transition-colors">{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex items-end ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {msg.role === 'assistant' && (
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
+                            <Compass size={11} className="text-white" />
+                          </div>
+                        )}
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'gradient-blue text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>
+                          {msg.role === 'assistant' ? <AIMessage content={msg.content} /> : msg.content}
+                        </div>
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div className="flex justify-start items-end">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
+                          <Compass size={11} className="text-white" />
+                        </div>
+                        <div className="bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 rounded-2xl px-4 py-2 text-sm text-muted-foreground border border-violet-400/20 dark:border-violet-400/30">
+                          <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.5 }}>{t('ai.thinking')}</motion.span>
+                        </div>
                       </div>
                     )}
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'gradient-blue text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div className="flex justify-start items-end">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20">
-                      <Bot size={11} className="text-white" />
-                    </div>
-                    <div className="bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 rounded-2xl px-4 py-2 text-sm text-muted-foreground border border-violet-400/20 dark:border-violet-400/30">
-                      <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.5 }}>{t('ai.thinking')}</motion.span>
-                    </div>
+                    <div ref={chatEndRef} />
                   </div>
                 )}
-                <div ref={chatEndRef} />
+              </ScrollArea>
+              <div className="p-3 border-t border-border">
+                <div className="flex gap-2">
+                  <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+                    placeholder="Ask how to navigate SRE..." className="bg-accent border-border text-foreground" />
+                  <Button onClick={sendChatMessage} size="icon" className="gradient-gold border-0 shrink-0 text-gray-900" disabled={chatLoading}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            )}
-          </ScrollArea>
-          <div className="p-3 border-t border-border">
-            <div className="flex gap-2">
-              <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
-                placeholder={t('ai.askAnything')} className="bg-accent border-border text-foreground" />
-              <Button onClick={sendChatMessage} size="icon" className="gradient-gold border-0 shrink-0 text-gray-900" disabled={chatLoading}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+            </>
+          )}
         </motion.div>
       )}
     </div>

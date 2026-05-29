@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   BarChart, Bar,
 } from 'recharts';
+import { Scale } from 'lucide-react';
 
 interface CalorieData {
   date: string;
@@ -89,7 +90,17 @@ export function WorkoutChart({ data }: { data: WorkoutData[] }) {
 }
 
 export function WeightChart({ data }: { data: { date: string; weight: number }[] }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <Scale className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm font-medium text-muted-foreground/60">No weight data available yet</p>
+          <p className="text-xs text-muted-foreground/40 mt-1">Log your weight in the overview tab to see progress here</p>
+        </div>
+      </div>
+    );
+  }
 
   // Ensure at least 2 points so recharts renders a visible line
   const chartData = data.length === 1 ? [data[0], { ...data[0] }] : data;
