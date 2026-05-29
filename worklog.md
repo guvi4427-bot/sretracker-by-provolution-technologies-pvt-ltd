@@ -116,3 +116,27 @@ Stage Summary:
 - Z.ai uses production API (https://internal-api.z.ai/v1/chat/completions) with REST fetch, NOT the dev SDK
 - Mobile chat alignment fixed with proper padding (px-4 sm:px-6) and consistent spacing
 - All changes pushed to git; deployment deferred until Vercel rate limit resets
+---
+Task ID: 1
+Agent: main
+Task: Fix like/repost/comment in feed and discover, share to chat/group, share link overflow
+
+Work Log:
+- Analyzed codebase: feed page, discover page, posts API, like/repost/comment routes, share dialog, live-updates API, Prisma schema
+- Identified root causes: live updates have no postId so like/repost/comment were no-ops; discover used inline fetch without await; share-to-chat missing receiverId; no share-to-group; share link overflow
+- Added LiveUpdateLike and LiveUpdateRepost Prisma models
+- Created /api/live-updates/[updateId]/like and /api/live-updates/[updateId]/repost API endpoints
+- Updated /api/feed/live-updates to include likes, reposts, isLiked, isReposted, entityType for all entity types
+- Fixed feed page: added toggleLiveUpdateLike/toggleLiveUpdateRepost functions, updated all 3 live update card action bars
+- Fixed discover page: added toggleLiveUpdateLike/toggleLiveUpdateRepost/togglePostLike/togglePostRepost functions, updated all action bars
+- Fixed discover page: added comment and repost buttons to regular post search results
+- Rewrote share-to-chat-dialog: added conversation picker with search, group picker, fixed URL overflow with min-w-0 + truncate
+- Updated vercel.json build command to include prisma db push for auto schema sync
+- Pushed to git and triggered deployments on both Vercel PIDs
+
+Stage Summary:
+- All like/repost/comment functionality now works for both regular posts and live updates
+- Share to chat now properly selects a conversation and sends with receiverId
+- Share to group allows picking from user's groups
+- Share link overflow fixed with proper CSS containment
+- Deployments triggered for both PIDs: dpl_8mXZRfPuVQvuPzXMGC7xo94Sy2mt (PID1) and dpl_6rLAc8kXTaZ4BHhGmJtRQRdCRSrC (PID2)
