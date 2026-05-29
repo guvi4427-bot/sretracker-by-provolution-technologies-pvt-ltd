@@ -87,26 +87,43 @@ export async function GET(req: Request) {
         }
         return true; // 'public' or not set
       })
-      .slice(0, limit)
-      .map(t => ({
-        id: t.id,
-        type: 'learning' as const,
-        name: t.name,
-        phase: t.phase,
-        entryCount: t._count.entries,
-        sharedAt: t.sharedAt,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        isOwn: !isGuest && t.userId === myUserId,
-        user: {
-          id: t.user.id,
-          username: t.user.username,
-          name: t.user.profile?.name || t.user.username,
-          avatarUrl: t.user.profile?.avatarUrl,
-          verified: t.user.profile?.verified || false,
-        },
-        hashtags: ['learning', t.phase || 'study'],
-      }));
+      .slice(0, limit);
+
+    // Batch-fetch like/repost counts for learning topics
+    const learningIds = learningUpdates.map(t => t.id);
+    const learningLikes = !isGuest && learningIds.length > 0 ? await db.liveUpdateLike.groupBy({ by: ['entityId'], where: { entityType: 'learning_topic', entityId: { in: learningIds } }, _count: true }) : [];
+    const learningReposts = !isGuest && learningIds.length > 0 ? await db.liveUpdateRepost.groupBy({ by: ['entityId'], where: { entityType: 'learning_topic', entityId: { in: learningIds } }, _count: true }) : [];
+    const learningUserLikes = !isGuest && learningIds.length > 0 ? await db.liveUpdateLike.findMany({ where: { entityType: 'learning_topic', entityId: { in: learningIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const learningUserReposts = !isGuest && learningIds.length > 0 ? await db.liveUpdateRepost.findMany({ where: { entityType: 'learning_topic', entityId: { in: learningIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const learningLikeCountMap = new Map(learningLikes.map(l => [l.entityId, l._count]));
+    const learningRepostCountMap = new Map(learningReposts.map(r => [r.entityId, r._count]));
+    const learningUserLikeSet = new Set(learningUserLikes.map(l => l.entityId));
+    const learningUserRepostSet = new Set(learningUserReposts.map(r => r.entityId));
+
+    const learningUpdatesFormatted = learningUpdates.map(t => ({
+      id: t.id,
+      type: 'learning' as const,
+      name: t.name,
+      phase: t.phase,
+      entryCount: t._count.entries,
+      sharedAt: t.sharedAt,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      isOwn: !isGuest && t.userId === myUserId,
+      user: {
+        id: t.user.id,
+        username: t.user.username,
+        name: t.user.profile?.name || t.user.username,
+        avatarUrl: t.user.profile?.avatarUrl,
+        verified: t.user.profile?.verified || false,
+      },
+      hashtags: ['learning', t.phase || 'study'],
+      likes: learningLikeCountMap.get(t.id) || 0,
+      reposts: learningRepostCountMap.get(t.id) || 0,
+      isLiked: learningUserLikeSet.has(t.id),
+      isReposted: learningUserRepostSet.has(t.id),
+      entityType: 'learning_topic' as const,
+    }));
 
     // ── Content Updates ──
     // Need to check shareContentStatus + isPublic/follower status
@@ -129,31 +146,48 @@ export async function GET(req: Request) {
       take: limit * 2,
     });
 
-    const contentUpdates = contentEntries
+    const contentUpdatesFiltered = contentEntries
       .filter(e => isVisible(e.userId, e.user.profile?.isPublic !== false, e.user.profile?.shareContentStatus === true))
-      .slice(0, limit)
-      .map(e => ({
-        id: e.id,
-        type: 'content' as const,
-        title: e.title,
-        contentType: e.contentType,
-        liveStatus: e.liveStatus,
-        status: e.status,
-        platform: e.platform,
-        updatedAt: e.updatedAt,
-        createdAt: e.createdAt,
-        seriesName: e.series?.name || null,
-        seriesCategory: e.series?.category || null,
-        isOwn: !isGuest && e.userId === myUserId,
-        user: {
-          id: e.user.id,
-          username: e.user.username,
-          name: e.user.profile?.name || e.user.username,
-          avatarUrl: e.user.profile?.avatarUrl,
-          verified: e.user.profile?.verified || false,
-        },
-        hashtags: ['content', 'progress'],
-      }));
+      .slice(0, limit);
+
+    // Batch-fetch like/repost counts for content entries
+    const contentIds = contentUpdatesFiltered.map(e => e.id);
+    const contentLikes = !isGuest && contentIds.length > 0 ? await db.liveUpdateLike.groupBy({ by: ['entityId'], where: { entityType: 'content_entry', entityId: { in: contentIds } }, _count: true }) : [];
+    const contentReposts = !isGuest && contentIds.length > 0 ? await db.liveUpdateRepost.groupBy({ by: ['entityId'], where: { entityType: 'content_entry', entityId: { in: contentIds } }, _count: true }) : [];
+    const contentUserLikes = !isGuest && contentIds.length > 0 ? await db.liveUpdateLike.findMany({ where: { entityType: 'content_entry', entityId: { in: contentIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const contentUserReposts = !isGuest && contentIds.length > 0 ? await db.liveUpdateRepost.findMany({ where: { entityType: 'content_entry', entityId: { in: contentIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const contentLikeCountMap = new Map(contentLikes.map(l => [l.entityId, l._count]));
+    const contentRepostCountMap = new Map(contentReposts.map(r => [r.entityId, r._count]));
+    const contentUserLikeSet = new Set(contentUserLikes.map(l => l.entityId));
+    const contentUserRepostSet = new Set(contentUserReposts.map(r => r.entityId));
+
+    const contentUpdates = contentUpdatesFiltered.map(e => ({
+      id: e.id,
+      type: 'content' as const,
+      title: e.title,
+      contentType: e.contentType,
+      liveStatus: e.liveStatus,
+      status: e.status,
+      platform: e.platform,
+      updatedAt: e.updatedAt,
+      createdAt: e.createdAt,
+      seriesName: e.series?.name || null,
+      seriesCategory: e.series?.category || null,
+      isOwn: !isGuest && e.userId === myUserId,
+      user: {
+        id: e.user.id,
+        username: e.user.username,
+        name: e.user.profile?.name || e.user.username,
+        avatarUrl: e.user.profile?.avatarUrl,
+        verified: e.user.profile?.verified || false,
+      },
+      hashtags: ['content', 'progress'],
+      likes: contentLikeCountMap.get(e.id) || 0,
+      reposts: contentRepostCountMap.get(e.id) || 0,
+      isLiked: contentUserLikeSet.has(e.id),
+      isReposted: contentUserRepostSet.has(e.id),
+      entityType: 'content_entry' as const,
+    }));
 
     // ── Fitness Updates (Workouts) ──
     // Need to check shareFitnessProgress + isPublic/follower status
@@ -174,10 +208,22 @@ export async function GET(req: Request) {
       take: limit * 2,
     });
 
-    const fitnessUpdates = recentWorkouts
+    const fitnessUpdatesFiltered = recentWorkouts
       .filter(w => isVisible(w.userId, w.user.profile?.isPublic !== false, w.user.profile?.shareFitnessProgress === true))
-      .slice(0, limit)
-      .map(w => {
+      .slice(0, limit);
+
+    // Batch-fetch like/repost counts for workout entries
+    const workoutIds = fitnessUpdatesFiltered.map(w => w.id);
+    const workoutLikes = !isGuest && workoutIds.length > 0 ? await db.liveUpdateLike.groupBy({ by: ['entityId'], where: { entityType: 'fitness_workout', entityId: { in: workoutIds } }, _count: true }) : [];
+    const workoutReposts = !isGuest && workoutIds.length > 0 ? await db.liveUpdateRepost.groupBy({ by: ['entityId'], where: { entityType: 'fitness_workout', entityId: { in: workoutIds } }, _count: true }) : [];
+    const workoutUserLikes = !isGuest && workoutIds.length > 0 ? await db.liveUpdateLike.findMany({ where: { entityType: 'fitness_workout', entityId: { in: workoutIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const workoutUserReposts = !isGuest && workoutIds.length > 0 ? await db.liveUpdateRepost.findMany({ where: { entityType: 'fitness_workout', entityId: { in: workoutIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const workoutLikeCountMap = new Map(workoutLikes.map(l => [l.entityId, l._count]));
+    const workoutRepostCountMap = new Map(workoutReposts.map(r => [r.entityId, r._count]));
+    const workoutUserLikeSet = new Set(workoutUserLikes.map(l => l.entityId));
+    const workoutUserRepostSet = new Set(workoutUserReposts.map(r => r.entityId));
+
+    const fitnessUpdates = fitnessUpdatesFiltered.map(w => {
         const goal = goalMap.get(w.userId) || 'maintain';
         const isGaining = goal === 'gain';
         return {
@@ -203,6 +249,11 @@ export async function GET(req: Request) {
             fitnessGoal: goal,
           },
           hashtags: ['fitness', isGaining ? 'gains' : 'shredding'],
+          likes: workoutLikeCountMap.get(w.id) || 0,
+          reposts: workoutRepostCountMap.get(w.id) || 0,
+          isLiked: workoutUserLikeSet.has(w.id),
+          isReposted: workoutUserRepostSet.has(w.id),
+          entityType: 'fitness_workout' as const,
         };
       });
 
@@ -251,7 +302,20 @@ export async function GET(req: Request) {
       });
     }
 
-    const weightUpdates = visibleWeightLogs.slice(0, limit).map(w => {
+    const weightUpdates = visibleWeightLogs.slice(0, limit);
+
+    // Batch-fetch like/repost counts for weight entries
+    const weightIds = weightUpdates.map(w => w.id);
+    const weightLikes = !isGuest && weightIds.length > 0 ? await db.liveUpdateLike.groupBy({ by: ['entityId'], where: { entityType: 'fitness_weight', entityId: { in: weightIds } }, _count: true }) : [];
+    const weightReposts = !isGuest && weightIds.length > 0 ? await db.liveUpdateRepost.groupBy({ by: ['entityId'], where: { entityType: 'fitness_weight', entityId: { in: weightIds } }, _count: true }) : [];
+    const weightUserLikes = !isGuest && weightIds.length > 0 ? await db.liveUpdateLike.findMany({ where: { entityType: 'fitness_weight', entityId: { in: weightIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const weightUserReposts = !isGuest && weightIds.length > 0 ? await db.liveUpdateRepost.findMany({ where: { entityType: 'fitness_weight', entityId: { in: weightIds }, userId: myUserId }, select: { entityId: true } }) : [];
+    const weightLikeCountMap = new Map(weightLikes.map(l => [l.entityId, l._count]));
+    const weightRepostCountMap = new Map(weightReposts.map(r => [r.entityId, r._count]));
+    const weightUserLikeSet = new Set(weightUserLikes.map(l => l.entityId));
+    const weightUserRepostSet = new Set(weightUserReposts.map(r => r.entityId));
+
+    const weightUpdatesFormatted = weightUpdates.map(w => {
       const goal = goalMap.get(w.userId) || 'maintain';
       const isGaining = goal === 'gain';
       const trend = weightTrendMap.get(w.userId) || [];
@@ -286,14 +350,19 @@ export async function GET(req: Request) {
           fitnessGoal: goal,
         },
         hashtags: ['fitness', isGaining ? 'gains' : 'shredding'],
+        likes: weightLikeCountMap.get(w.id) || 0,
+        reposts: weightRepostCountMap.get(w.id) || 0,
+        isLiked: weightUserLikeSet.has(w.id),
+        isReposted: weightUserRepostSet.has(w.id),
+        entityType: 'fitness_weight' as const,
       };
     });
 
     const response = NextResponse.json({
-      learningUpdates,
+      learningUpdates: learningUpdatesFormatted,
       contentUpdates,
       fitnessUpdates,
-      weightUpdates,
+      weightUpdates: weightUpdatesFormatted,
     });
     // Ensure no caching so toggle changes are reflected immediately
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

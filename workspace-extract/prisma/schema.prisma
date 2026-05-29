@@ -67,6 +67,8 @@ model User {
   dmConversations1 DMConversation[] @relation("DMParticipant1")
   dmConversations2 DMConversation[] @relation("DMParticipant2")
   dmMessagesSent   DMMessage[]      @relation("DMSender")
+  liveUpdateLikes   LiveUpdateLike[]
+  liveUpdateReposts LiveUpdateRepost[]
 
   postsLikedIds     String? // JSON array of post IDs
   postsBookmarkedIds String? // JSON array of post IDs
@@ -756,4 +758,34 @@ model DMMessage {
 
   conversation DMConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User           @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+// ─── Live Update Interaction Models ───
+// Supports like/repost on ContentEntry, FitnessWorkoutLog, FitnessWeightLog, LearningTopic
+
+model LiveUpdateLike {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String   // content_entry, fitness_workout, fitness_weight, learning_topic
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, userId])
+  @@index([entityType, entityId])
+}
+
+model LiveUpdateRepost {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String   // content_entry, fitness_workout, fitness_weight, learning_topic
+  entityId   String
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, userId])
+  @@index([entityType, entityId])
 }

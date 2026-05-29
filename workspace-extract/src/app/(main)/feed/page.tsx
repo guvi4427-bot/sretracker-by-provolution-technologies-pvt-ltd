@@ -286,10 +286,10 @@ export default function FeedPage() {
 
             {/* Action bar for live updates */}
             <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
-              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => openShareDialog({ type: 'content_update', id: update.id, preview: update.title || 'Content update', userName: update.user?.name, username: update.user?.username, extra: { contentType: update.contentType, status: update.liveStatus } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateLike(update.id, update.entityType || 'content_entry', update.isLiked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'content_entry', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => openShareDialog({ type: 'content_update', id: update.id, preview: update.title || 'Content update', userName: update.user?.name, username: update.user?.username, extra: { contentType: update.contentType, status: update.liveStatus, entityType: update.entityType || 'content_entry' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -440,10 +440,10 @@ export default function FeedPage() {
 
             {/* Action bar for live updates */}
             <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
-              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => openShareDialog({ type: 'fitness_update', id: update.id, preview: update.subType === 'weight' ? `Weight: ${update.weight}kg` : `${update.workoutType || 'Workout'} ${update.duration ? update.duration + 'min' : ''}${update.estimatedCalories ? ' ' + update.estimatedCalories + 'cal' : ''}`, userName: update.user?.name, username: update.user?.username, extra: { fitnessType: update.subType || 'workout' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateLike(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isLiked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => openShareDialog({ type: 'fitness_update', id: update.id, preview: update.subType === 'weight' ? `Weight: ${update.weight}kg` : `${update.workoutType || 'Workout'} ${update.duration ? update.duration + 'min' : ''}${update.estimatedCalories ? ' ' + update.estimatedCalories + 'cal' : ''}`, userName: update.user?.name, username: update.user?.username, extra: { fitnessType: update.subType || 'workout', entityType: update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout') } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -528,10 +528,10 @@ export default function FeedPage() {
 
             {/* Action bar for live updates */}
             <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/20">
-              <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(`/shared-topic/${update.id}?from=feed`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
-              <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => openShareDialog({ type: 'learning_update', id: update.id, preview: update.name || 'Learning topic', userName: update.user?.name, username: update.user?.username })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateLike(update.id, update.entityType || 'learning_topic', update.isLiked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
+              <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(`/shared-topic/${update.id}?from=feed`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
+              <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'learning_topic', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
+              <button onClick={() => openShareDialog({ type: 'learning_update', id: update.id, preview: update.name || 'Learning topic', userName: update.user?.name, username: update.user?.username, extra: { entityType: update.entityType || 'learning_topic' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -746,6 +746,33 @@ export default function FeedPage() {
         await fetch(`/api/posts/${postId}/repost`, { method: 'POST' });
       }
       fetchPosts();
+    } catch {}
+  }
+
+  // Like/repost for live updates (ContentEntry, FitnessWorkoutLog, FitnessWeightLog, LearningTopic)
+  async function toggleLiveUpdateLike(updateId: string, entityType: string, isLiked: boolean) {
+    if (isGuest) { showLoginPrompt('like'); return; }
+    try {
+      const url = `/api/live-updates/${updateId}/like?entityType=${encodeURIComponent(entityType)}`;
+      if (isLiked) {
+        await fetch(url, { method: 'DELETE' });
+      } else {
+        await fetch(url, { method: 'POST' });
+      }
+      fetchLiveUpdates();
+    } catch {}
+  }
+
+  async function toggleLiveUpdateRepost(updateId: string, entityType: string, isReposted: boolean) {
+    if (isGuest) { showLoginPrompt('repost'); return; }
+    try {
+      const url = `/api/live-updates/${updateId}/repost?entityType=${encodeURIComponent(entityType)}`;
+      if (isReposted) {
+        await fetch(url, { method: 'DELETE' });
+      } else {
+        await fetch(url, { method: 'POST' });
+      }
+      fetchLiveUpdates();
     } catch {}
   }
 
