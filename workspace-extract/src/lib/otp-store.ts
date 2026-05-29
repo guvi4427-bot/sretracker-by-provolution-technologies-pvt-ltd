@@ -5,3 +5,12 @@ if (!globalForOtp.otpStore) {
   globalForOtp.otpStore = new Map<string, { otp: string; expires: number }>();
 }
 export const otpStore = globalForOtp.otpStore;
+
+export async function cleanupExpiredOtps() {
+  const now = Date.now();
+  for (const [key, value] of otpStore.entries()) {
+    if (value.expires < now) {
+      otpStore.delete(key);
+    }
+  }
+}

@@ -89,15 +89,55 @@ export function WorkoutChart({ data }: { data: WorkoutData[] }) {
 }
 
 export function WeightChart({ data }: { data: { date: string; weight: number }[] }) {
+  if (!data || data.length === 0) return null;
+
+  // Pad to at least 2 points so recharts draws a visible line/dot
+  const chartData = data.length === 1
+    ? [data[0], { ...data[0] }]
+    : data;
+
+  // Compute Y domain with padding so the line is never flush against top/bottom
+  const weights = chartData.map(d => d.weight).filter(Boolean);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const padding = Math.max(1, (maxW - minW) * 0.2);
+  const yMin = Math.floor(minW - padding);
+  const yMax = Math.ceil(maxW + padding);
+
   return (
-    <div className="h-64">
+    <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }} />
-          <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }} />
-          <Tooltip content={<CustomTooltip />} />
-          <Line type="monotone" dataKey="weight" name="Weight (kg)" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3, fill: '#3B82F6' }} />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+            tickLine={false}
+            axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            domain={[yMin, yMax]}
+            tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `${v}kg`}
+            width={42}
+          />
+          <Tooltip
+            content={<CustomTooltip />}
+            cursor={{ stroke: 'rgba(59,130,246,0.3)', strokeWidth: 1 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="weight"
+            name="Weight (kg)"
+            stroke="#3B82F6"
+            strokeWidth={2.5}
+            dot={{ r: 4, fill: '#3B82F6', strokeWidth: 2, stroke: '#1d4ed8' }}
+            activeDot={{ r: 6, fill: '#60a5fa', stroke: '#3B82F6', strokeWidth: 2 }}
+            connectNulls
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

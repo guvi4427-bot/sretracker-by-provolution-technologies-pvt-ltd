@@ -488,10 +488,17 @@ export default function FitnessPage() {
   }
 
   // Weight chart data
-  const weightChartData = weightLogs.slice(-30).map((w: any) => ({
-    date: w.date?.slice(5) || w.date,
-    weight: w.weight,
-  }));
+  const weightChartData = weightLogs.slice(-30).map((w: any) => {
+    // Handle both "2026-05-28" and "2026-05-28T00:00:00.000Z" formats
+    const rawDate = w.date || '';
+    const dateOnly = rawDate.includes('T') ? rawDate.split('T')[0] : rawDate;
+    const parts = dateOnly.split('-'); // ['2026', '05', '28']
+    const label = parts.length === 3 ? `${parts[1]}/${parts[2]}` : rawDate;
+    return {
+      date: label,
+      weight: typeof w.weight === 'number' ? w.weight : parseFloat(w.weight),
+    };
+  }).filter(d => !isNaN(d.weight));
 
   // Workout chart data (for progress tab)
   const workoutChartData = [...workouts, ...Object.values(workoutHistory).flat()]
@@ -1316,7 +1323,7 @@ export default function FitnessPage() {
           </GlassCard>
 
           {/* Weight Progress Chart */}
-          {weightChartData.length > 1 && (
+          {weightChartData.length > 0 && (
             <GlassCard variant="glowing" className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp size={16} className="text-blue-400" />

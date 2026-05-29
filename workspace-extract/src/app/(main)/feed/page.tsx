@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Heart, MessageCircle, Repeat2, MoreHorizontal, Send, Trash2, Flag, Loader2, BookOpen, AlertTriangle, Bookmark, Rss, FileText, ChevronRight, Globe, Sparkles, Video, Edit3, ExternalLink, Film, PenTool, Check, Dumbbell, TrendingUp, Activity, Flame, Scale, Zap, Trophy, Share2 } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { AdCard } from '@/components/ad-banner';
+import ShareToChatDialog, { ShareData } from '@/components/share-to-chat-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -288,7 +289,7 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Live Update`, text: update.title || 'Check out this live update!', url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => openShareDialog({ type: 'content_update', id: update.id, preview: update.title || 'Content update', userName: update.user?.name, username: update.user?.username, extra: { contentType: update.contentType, status: update.liveStatus } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -442,7 +443,7 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Fitness Update`, text: `${update.workoutType || 'Workout'} - ${update.duration || ''}min`, url: `${window.location.origin}/profile/${update.user?.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/profile/${update.user?.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => openShareDialog({ type: 'fitness_update', id: update.id, preview: update.subType === 'weight' ? `Weight: ${update.weight}kg` : `${update.workoutType || 'Workout'} ${update.duration ? update.duration + 'min' : ''}${update.estimatedCalories ? ' ' + update.estimatedCalories + 'cal' : ''}`, userName: update.user?.name, username: update.user?.username, extra: { fitnessType: update.subType || 'workout' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -530,7 +531,7 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('like'); return; } if (update.postId) { toggleLike(update.postId, update.isLiked || false); } else { toast.success('Liked!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isLiked ? 'text-rose-400' : 'text-muted-foreground/70 hover:text-rose-400'}`}><Heart size={13} fill={update.isLiked ? 'currentColor' : 'none'} />{update.likes || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { setCommentPostId(update.postId); loadComments(update.postId); } else { router.push(`/shared-topic/${update.id}?from=feed`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => { if (isGuest) { showLoginPrompt('repost'); return; } if (update.postId) { toggleRepost(update.postId, update.isReposted || false); } else { toast.success('Reposted!'); } }} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
-              <button onClick={() => { try { if (navigator.share) { navigator.share({ title: `${update.user?.name || 'User'}'s Learning Topic`, text: update.name || 'Check out this learning topic!', url: `${window.location.origin}/shared-topic/${update.id}` }); } else { navigator.clipboard.writeText(`${window.location.origin}/shared-topic/${update.id}`); toast.success('Link copied!'); } } catch {} }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => openShareDialog({ type: 'learning_update', id: update.id, preview: update.name || 'Learning topic', userName: update.user?.name, username: update.user?.username })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
             </div>
           </div>
         </div>
@@ -793,6 +794,14 @@ export default function FeedPage() {
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [activeFeedTab, setActiveFeedTab] = useState('feed');
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareData, setShareData] = useState<ShareData | null>(null);
+
+  function openShareDialog(data: ShareData) {
+    if (isGuest) { showLoginPrompt('share'); return; }
+    setShareData(data);
+    setShareDialogOpen(true);
+  }
 
   function openReport(postId: string) {
     setReportTargetId(postId);
@@ -816,9 +825,14 @@ export default function FeedPage() {
   }
 
   function renderContent(text: string) {
-    return text.split(/(#\w+|@\w+)/g).map((part, i) => {
+    // Split on hashtags, mentions, and URLs
+    return text.split(/(#[\w]+|@[\w]+|https?:\/\/[^\s]+)/g).map((part, i) => {
       if (part.startsWith('#')) return <span key={i} className="text-blue-400 cursor-pointer" onClick={() => router.push(`/discover?q=${encodeURIComponent(part)}`)}>{part}</span>;
       if (part.startsWith('@')) return <span key={i} className="text-purple-400 cursor-pointer" onClick={() => { const username = part.slice(1); fetch(`/api/user/check-username?username=${encodeURIComponent(username)}`).then(r => r.ok ? r.json() : null).then(data => { if (data?.userId) router.push(`/profile/${data.userId}`); }); }}>{part}</span>;
+      if (part.startsWith('http://') || part.startsWith('https://')) {
+        const href = part.replace(/[.,;:!?)\]]+$/, ''); // strip trailing punctuation
+        return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline underline-offset-2 hover:text-blue-300 break-all">{part}</a>;
+      }
       return part;
     });
   }
@@ -874,6 +888,7 @@ export default function FeedPage() {
               <button onClick={() => { setCommentPostId(post.id); loadComments(post.id); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={14} />{post.stats?.comments || post._count?.comments || 0}</button>
               <button onClick={() => toggleRepost(post.id, post.isReposted)} className={`flex items-center gap-1 text-xs transition-colors ${post.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={14} />{post.stats?.reposts || post._count?.reposts || 0}</button>
               <button onClick={() => toggleBookmark(post.id, post.isBookmarked)} className={`flex items-center gap-1 text-xs transition-colors ${post.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={14} fill={post.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openShareDialog({ type: 'post', id: post.id, preview: post.content?.slice(0, 120) || '', userName: post.user?.name, username: post.user?.username })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={14} /></button>
               <button onClick={() => openReport(post.id)} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
             {/* Comments */}
@@ -1260,6 +1275,9 @@ export default function FeedPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Share to Chat Dialog */}
+      <ShareToChatDialog isOpen={shareDialogOpen} onClose={() => setShareDialogOpen(false)} shareData={shareData} />
     </div>
   );
 }

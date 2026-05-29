@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { MessageCircle, Users, Plus, Send, Settings, Shield, LogOut, Crown, Search, Loader2, ArrowLeft, X, BookOpen, Globe, Sparkles, ChevronRight } from 'lucide-react';
+import { MessageCircle, Users, Plus, Send, Settings, Shield, LogOut, Crown, Search, Loader2, ArrowLeft, X, BookOpen, Globe, Sparkles, ChevronRight, FileText, Dumbbell, Activity, Video, Rss } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,8 +52,20 @@ function TopicShareCard({ content, router }: { content: string; router: ReturnTy
   );
 }
 
-// ── Render message content with topic card detection ──
+// ── Helper: render clickable links in plain text ──
+function renderTextWithLinks(text: string) {
+  return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+    if (part.startsWith('http://') || part.startsWith('https://')) {
+      const href = part.replace(/[.,;:!?)\]]+$/, '');
+      return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline underline-offset-2 hover:text-blue-300 break-all">{part}</a>;
+    }
+    return part;
+  });
+}
+
+// ── Render message content with rich card detection ──
 function renderMessageContent(content: string, router: ReturnType<typeof useRouter>) {
+  // 1) Topic share (existing pattern)
   const isTopicShare = content.startsWith('📚 Shared learning topic:') || content.startsWith('📚 Shared my learning collection:');
   const topicIdMatch = content.match(/\[topicId:([\w-]+)\]/);
   const topicId = topicIdMatch ? topicIdMatch[1] : null;
@@ -79,7 +91,103 @@ function renderMessageContent(content: string, router: ReturnType<typeof useRout
     );
   }
 
-  return content;
+  // 2) Shared post
+  if (content.startsWith('📌 Shared a post')) {
+    const postIdMatch = content.match(/\[postId:([\w-]+)\]/);
+    const postId = postIdMatch ? postIdMatch[1] : null;
+    const cleanContent = content.replace(/\[postId:[\w-]+\]/, '').replace('📌 Shared a post', '').replace(/^\s*by\s+[^:]+:/, '').trim().replace(/^"|"$/g, '');
+    const byMatch = content.match(/by\s+([^:]+):/);
+    const byName = byMatch ? byMatch[1].trim() : null;
+
+    return (
+      <div className="mt-1">
+        <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <FileText size={12} className="text-blue-400 shrink-0" />
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-600/20 text-blue-400">Post</span>
+            {byName && <span className="text-[10px] text-muted-foreground">by {byName}</span>}
+          </div>
+          <p className="text-xs text-foreground/80 line-clamp-3 mb-2">{cleanContent}</p>
+          <button
+            onClick={() => router.push('/feed')}
+            className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-md bg-blue-600/10 hover:bg-blue-600/15 border border-blue-500/20 transition-colors group"
+          >
+            <Rss size={12} className="text-blue-400 shrink-0" />
+            <span className="text-[10px] text-blue-300 font-medium flex-1 text-left">View Post in Feed</span>
+            <ChevronRight size={12} className="text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3) Shared content update
+  if (content.startsWith('🎬 Shared a content update')) {
+    const idMatch = content.match(/\[contentEntryId:([\w-]+)\]/);
+    const contentTypeMatch = content.match(/\[contentType:(\w+)\]/);
+    const statusMatch = content.match(/\[status:([\w_]+)\]/);
+    const cleanContent = content.replace(/\[contentEntryId:[\w-]+\]/, '').replace(/\[contentType:\w+\]/, '').replace(/\[status:[\w_]+\]/, '').replace('🎬 Shared a content update', '').replace(/^\s*by\s+[^:]+:/, '').trim().replace(/^"|"$/g, '');
+    const byMatch = content.match(/by\s+([^:]+):/);
+    const byName = byMatch ? byMatch[1].trim() : null;
+    const ctLabel = contentTypeMatch ? contentTypeMatch[1].charAt(0).toUpperCase() + contentTypeMatch[1].slice(1) : 'Content';
+    const statusLabel = statusMatch ? statusMatch[1].replace(/_/g, ' ') : '';
+
+    return (
+      <div className="mt-1">
+        <div className="bg-purple-600/10 border border-purple-500/20 rounded-lg p-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Video size={12} className="text-purple-400 shrink-0" />
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-600/20 text-purple-400">{ctLabel}</span>
+            {statusLabel && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-green-600/15 text-green-400">{statusLabel}</span>}
+            {byName && <span className="text-[10px] text-muted-foreground">by {byName}</span>}
+          </div>
+          <p className="text-xs text-foreground/80 line-clamp-2 mb-2">{cleanContent}</p>
+          <button
+            onClick={() => router.push('/feed')}
+            className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-md bg-purple-600/10 hover:bg-purple-600/15 border border-purple-500/20 transition-colors group"
+          >
+            <Globe size={12} className="text-purple-400 shrink-0" />
+            <span className="text-[10px] text-purple-300 font-medium flex-1 text-left">View in Feed</span>
+            <ChevronRight size={12} className="text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 4) Shared fitness update
+  if (content.startsWith('💪 Shared a fitness update')) {
+    const idMatch = content.match(/\[fitnessId:([\w-]+)\]/);
+    const fitnessTypeMatch = content.match(/\[fitnessType:(\w+)\]/);
+    const cleanContent = content.replace(/\[fitnessId:[\w-]+\]/, '').replace(/\[fitnessType:\w+\]/, '').replace('💪 Shared a fitness update', '').replace(/^\s*by\s+[^:]+:/, '').trim().replace(/^"|"$/g, '');
+    const byMatch = content.match(/by\s+([^:]+):/);
+    const byName = byMatch ? byMatch[1].trim() : null;
+    const isWeight = fitnessTypeMatch?.[1] === 'weight';
+
+    return (
+      <div className="mt-1">
+        <div className="bg-green-600/10 border border-green-500/20 rounded-lg p-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            {isWeight ? <Activity size={12} className="text-green-400 shrink-0" /> : <Dumbbell size={12} className="text-green-400 shrink-0" />}
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-green-600/20 text-green-400">{isWeight ? 'Weight' : 'Workout'}</span>
+            {byName && <span className="text-[10px] text-muted-foreground">by {byName}</span>}
+          </div>
+          <p className="text-xs text-foreground/80 line-clamp-2 mb-2">{cleanContent}</p>
+          <button
+            onClick={() => router.push('/feed')}
+            className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-md bg-green-600/10 hover:bg-green-600/15 border border-green-500/20 transition-colors group"
+          >
+            <Activity size={12} className="text-green-400 shrink-0" />
+            <span className="text-[10px] text-green-300 font-medium flex-1 text-left">View in Feed</span>
+            <ChevronRight size={12} className="text-green-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 5) Regular message — render with clickable links
+  return renderTextWithLinks(content);
 }
 
 export default function MessagesPage() {
