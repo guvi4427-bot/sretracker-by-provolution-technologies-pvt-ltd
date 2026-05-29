@@ -8,7 +8,7 @@
 //   Tier 5: z-ai-web-dev-sdk (works inside Z.AI hosting)
 //
 // Features:
-//   - maxTokens = 5000 (was 500 — prevents truncation)
+//   - maxTokens = 25000 (was 500 → 5000 — allows comprehensive, detailed responses)
 //   - Retry logic: current provider → lightweight prompt → backup provider → emergency
 //   - Telemetry: provider, latency, tokens, retry count, errors
 //   - No hardcoded "I'm having trouble" fallbacks — retries instead
@@ -18,7 +18,7 @@ const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
 const POLLINATIONS_TEXT   = 'https://text.pollinations.ai/';
 
 const REQUEST_TIMEOUT_MS = 25000;
-const MAX_TOKENS = 5000; // Was 500 — now allows full responses
+const MAX_TOKENS = 25000; // Was 500 → 5000 → 25000 — allows comprehensive, detailed responses
 
 // ── Telemetry Types ──
 export interface AITelemetry {
@@ -254,7 +254,7 @@ export async function aiChat(
 export async function aiStructuredChat<T>(
   messages: { role: string; content: string }[],
   systemPrompt?: string,
-  maxTokens = 500
+  maxTokens = 25000
 ): Promise<T | null> {
   const allMessages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
