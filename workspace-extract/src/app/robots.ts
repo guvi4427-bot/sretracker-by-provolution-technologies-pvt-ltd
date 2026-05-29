@@ -47,6 +47,48 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
       },
       {
+        userAgent: "Googlebot-News",
+        allow: "/",
+      },
+      {
+        userAgent: "Googlebot-Video",
+        allow: "/",
+      },
+      {
+        userAgent: "AdsBot-Google",
+        allow: "/",
+      },
+      {
+        userAgent: "Bytespider",
+        allow: "/",
+        crawlDelay: 5,
+      },
+      {
+        userAgent: "Applebot",
+        allow: "/",
+      },
+      {
+        userAgent: "YandexBot",
+        allow: "/",
+        crawlDelay: 5,
+      },
+      {
+        userAgent: "Discordbot",
+        allow: "/",
+      },
+      {
+        userAgent: "Slackbot",
+        allow: "/",
+      },
+      {
+        userAgent: "LinkedInBot",
+        allow: "/",
+      },
+      {
+        userAgent: "SemrushBot",
+        allow: "/",
+      },
+      {
         userAgent: "*",
         allow: "/",
         disallow: [

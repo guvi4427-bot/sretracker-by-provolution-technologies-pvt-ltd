@@ -178,6 +178,8 @@ function GuestShellInner({ children }: { children: React.ReactNode }) {
 
         {/* Footer Links */}
         <div className="mt-4 pt-4 border-t border-border flex items-center justify-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/50">
+          <a href="/blog" className="hover:text-muted-foreground transition-colors">Blog</a>
+          <span>·</span>
           <a href="/about" className="hover:text-muted-foreground transition-colors">About</a>
           <span>·</span>
           <a href="/contact" className="hover:text-muted-foreground transition-colors">Contact</a>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check, Heart, MessageCircle, Repeat2, Share2 } from 'lucide-react';
+import { Search, Globe, Lock, Users, BadgeCheck, Loader2, BookOpen, UserPlus, LogIn, ChevronRight, Sparkles, Activity, Dumbbell, Flame, Scale, Zap, Trophy, Video, FileText, Film, PenTool, Edit3, ExternalLink, Check, Heart, MessageCircle, Repeat2, Share2, Bookmark, Flag } from 'lucide-react';
 import { GlassCard } from '@/components/glass-card';
 import { AdCard } from '@/components/ad-banner';
 import ShareToChatDialog, { ShareData } from '@/components/share-to-chat-dialog';
@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/stores/user-store';
 import { t } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
@@ -234,6 +237,49 @@ export default function DiscoverPage() {
     } catch {}
   }
 
+  async function toggleLiveUpdateBookmark(updateId: string, entityType: string, isBookmarked: boolean) {
+    if (isGuest) { showLoginPrompt('bookmark'); return; }
+    try {
+      const url = `/api/live-updates/${updateId}/bookmark?entityType=${encodeURIComponent(entityType)}`;
+      if (isBookmarked) {
+        await fetch(url, { method: 'DELETE' });
+      } else {
+        await fetch(url, { method: 'POST' });
+      }
+      fetchLiveUpdates();
+      toast.success(isBookmarked ? 'Bookmark removed' : 'Bookmarked!');
+    } catch {}
+  }
+
+  // Report state for live updates
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState<string|null>(null);
+  const [reportCategory, setReportCategory] = useState('');
+  const [reportReason, setReportReason] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  function openLiveUpdateReport(updateId: string, entityType: string) {
+    if (isGuest) { showLoginPrompt('report'); return; }
+    setReportTargetId(updateId);
+    setReportCategory('');
+    setReportReason('');
+    setReportOpen(true);
+  }
+
+  async function submitReport() {
+    if (!reportTargetId || !reportCategory || !reportReason.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+    setReportSubmitting(true);
+    try {
+      const r = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'live_update', targetId: reportTargetId, category: reportCategory, reason: reportReason.trim() }) });
+      if (r.ok) { toast.success('Report submitted'); setReportOpen(false); }
+      else { const d = await r.json(); toast.error(d.error || 'Report failed'); }
+    } catch { toast.error('Report failed'); }
+    finally { setReportSubmitting(false); }
+  }
+
   // Like/repost for regular posts (discover search results)
   async function togglePostLike(postId: string, isLiked: boolean) {
     if (isGuest) { showLoginPrompt('like'); return; }
@@ -358,6 +404,8 @@ export default function DiscoverPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { router.push(`/feed?comment=${update.postId}`); } else { router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'content_entry', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'content_update', id: update.id, preview: update.title || 'Content update', userName: update.user?.name, username: update.user?.username, extra: { contentType: update.contentType, status: update.liveStatus, entityType: update.entityType || 'content_entry' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || 'content_entry', update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || 'content_entry')} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -499,6 +547,8 @@ export default function DiscoverPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { router.push(`/feed?comment=${update.postId}`); } else { router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'fitness_update', id: update.id, preview: update.subType === 'weight' ? `Weight: ${update.weight}kg` : `${update.workoutType || 'Workout'} ${update.duration ? update.duration + 'min' : ''}${update.estimatedCalories ? ' ' + update.estimatedCalories + 'cal' : ''}`, userName: update.user?.name, username: update.user?.username, extra: { fitnessType: update.subType || 'workout', entityType: update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout') } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'))} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -579,6 +629,8 @@ export default function DiscoverPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } if (update.postId) { router.push(`/feed?comment=${update.postId}`); } else { router.push(`/shared-topic/${update.id}?from=discover`); } }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'learning_topic', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'learning_update', id: update.id, preview: update.name || 'Learning topic', userName: update.user?.name, username: update.user?.username, extra: { entityType: update.entityType || 'learning_topic' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || 'learning_topic', update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || 'learning_topic')} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -918,6 +970,38 @@ export default function DiscoverPage() {
 
       {/* Share to Chat Dialog */}
       <ShareToChatDialog isOpen={shareDialogOpen} onClose={() => setShareDialogOpen(false)} shareData={shareData} />
+
+      {/* Report Dialog for Live Updates */}
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag size={18} className="text-amber-400" />
+              Report Content
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1">Category</Label>
+              <select value={reportCategory} onChange={e => setReportCategory(e.target.value)} className="w-full p-2 rounded-md bg-accent border border-border text-foreground text-sm">
+                <option value="">Select category</option>
+                <option value="spam">Spam</option>
+                <option value="harassment">Harassment</option>
+                <option value="misinformation">Misinformation</option>
+                <option value="inappropriate">Inappropriate Content</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1">Reason</Label>
+              <Textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder="Describe the issue..." className="bg-accent border-border text-foreground text-sm" rows={3} />
+            </div>
+            <Button onClick={submitReport} disabled={reportSubmitting} className="w-full gradient-blue">
+              {reportSubmitting ? <Loader2 size={14} className="animate-spin" /> : 'Submit Report'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

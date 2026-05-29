@@ -290,6 +290,8 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/content' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'content_entry', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'content_update', id: update.id, preview: update.title || 'Content update', userName: update.user?.name, username: update.user?.username, extra: { contentType: update.contentType, status: update.liveStatus, entityType: update.entityType || 'content_entry' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || 'content_entry', update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || 'content_entry')} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -444,6 +446,8 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(isOwn ? '/fitness' : `/profile/${update.user?.id}`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'fitness_update', id: update.id, preview: update.subType === 'weight' ? `Weight: ${update.weight}kg` : `${update.workoutType || 'Workout'} ${update.duration ? update.duration + 'min' : ''}${update.estimatedCalories ? ' ' + update.estimatedCalories + 'cal' : ''}`, userName: update.user?.name, username: update.user?.username, extra: { fitnessType: update.subType || 'workout', entityType: update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout') } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'), update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || (update.subType === 'weight' ? 'fitness_weight' : 'fitness_workout'))} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -532,6 +536,8 @@ export default function FeedPage() {
               <button onClick={() => { if (isGuest) { showLoginPrompt('comment'); return; } router.push(`/shared-topic/${update.id}?from=feed`); }} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-cyan-400 transition-colors"><MessageCircle size={13} />{update.comments || 0}</button>
               <button onClick={() => toggleLiveUpdateRepost(update.id, update.entityType || 'learning_topic', update.isReposted || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isReposted ? 'text-green-400' : 'text-muted-foreground/70 hover:text-green-400'}`}><Repeat2 size={13} />{update.reposts || 0}</button>
               <button onClick={() => openShareDialog({ type: 'learning_update', id: update.id, preview: update.name || 'Learning topic', userName: update.user?.name, username: update.user?.username, extra: { entityType: update.entityType || 'learning_topic' } })} className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-blue-400 transition-colors"><Share2 size={13} /></button>
+              <button onClick={() => toggleLiveUpdateBookmark(update.id, update.entityType || 'learning_topic', update.isBookmarked || false)} className={`flex items-center gap-1 text-xs transition-colors ${update.isBookmarked ? 'text-amber-400' : 'text-muted-foreground/70 hover:text-amber-400'}`}><Bookmark size={13} fill={update.isBookmarked ? 'currentColor' : 'none'} /></button>
+              <button onClick={() => openLiveUpdateReport(update.id, update.entityType || 'learning_topic')} className="text-muted-foreground/60 hover:text-amber-400 ml-auto transition-colors"><Flag size={12} /></button>
             </div>
           </div>
         </div>
@@ -774,6 +780,28 @@ export default function FeedPage() {
       }
       fetchLiveUpdates();
     } catch {}
+  }
+
+  async function toggleLiveUpdateBookmark(updateId: string, entityType: string, isBookmarked: boolean) {
+    if (isGuest) { showLoginPrompt('bookmark'); return; }
+    try {
+      const url = `/api/live-updates/${updateId}/bookmark?entityType=${encodeURIComponent(entityType)}`;
+      if (isBookmarked) {
+        await fetch(url, { method: 'DELETE' });
+      } else {
+        await fetch(url, { method: 'POST' });
+      }
+      fetchLiveUpdates();
+      toast.success(isBookmarked ? 'Bookmark removed' : 'Bookmarked!');
+    } catch {}
+  }
+
+  function openLiveUpdateReport(updateId: string, entityType: string) {
+    if (isGuest) { showLoginPrompt('report'); return; }
+    setReportTargetId(updateId);
+    setReportCategory('');
+    setReportReason('');
+    setReportOpen(true);
   }
 
   async function addComment(postId: string) {

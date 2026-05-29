@@ -78,6 +78,48 @@ function buildSitemap(): string {
       changefreq: "monthly",
       priority: "0.5",
     },
+    {
+      loc: `${SITE_URL}/blog`,
+      lastmod: now,
+      changefreq: "weekly",
+      priority: "0.8",
+    },
+    {
+      loc: `${SITE_URL}/leaderboard`,
+      lastmod: now,
+      changefreq: "daily",
+      priority: "0.7",
+    },
+    {
+      loc: `${SITE_URL}/ai-hub`,
+      lastmod: now,
+      changefreq: "weekly",
+      priority: "0.7",
+    },
+    {
+      loc: `${SITE_URL}/fitness`,
+      lastmod: now,
+      changefreq: "daily",
+      priority: "0.6",
+    },
+    {
+      loc: `${SITE_URL}/learn`,
+      lastmod: now,
+      changefreq: "daily",
+      priority: "0.6",
+    },
+    {
+      loc: `${SITE_URL}/content`,
+      lastmod: now,
+      changefreq: "daily",
+      priority: "0.6",
+    },
+    {
+      loc: `${SITE_URL}/landing`,
+      lastmod: now,
+      changefreq: "monthly",
+      priority: "0.5",
+    },
   ];
 
   const urlElements = entries

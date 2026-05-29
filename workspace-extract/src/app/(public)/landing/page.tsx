@@ -273,6 +273,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="px-6 py-8 border-t border-white/5 text-center">
         <div className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1 text-xs text-white/30">
+          <a href="/blog" className="hover:text-white/60 transition-colors">Blog</a>
+          <span>·</span>
           <a href="/about" className="hover:text-white/60 transition-colors">About</a>
           <span>·</span>
           <a href="/contact" className="hover:text-white/60 transition-colors">Contact</a>

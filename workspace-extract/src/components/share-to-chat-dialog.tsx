@@ -51,12 +51,28 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   if (!shareData) return null;
 
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/shared-topic/${shareData.id}?from=share`
-    : '';
+  const getShareUrl = (data: ShareData): string => {
+    if (typeof window === 'undefined') return '';
+    const origin = window.location.origin;
+    switch (data.type) {
+      case 'post':
+        return `${origin}/feed?post=${data.id}`;
+      case 'learning_update':
+        return `${origin}/shared-topic/${data.id}?from=share`;
+      case 'content_update':
+        return `${origin}/discover?q=%23content`;
+      case 'fitness_update':
+        return `${origin}/discover?q=%23fitness`;
+      default:
+        return `${origin}/shared-topic/${data.id}?from=share`;
+    }
+  };
+
+  const shareUrl = getShareUrl(shareData);
 
   const shareMessage = `Shared: ${shareData.preview}\n\n${shareUrl}`;
 
@@ -171,7 +187,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setActiveSection('actions'); } }}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 size={18} />
@@ -179,6 +195,21 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
           </DialogTitle>
         </DialogHeader>
 
+        {error ? (
+          <div className="space-y-4">
+            <div className="bg-destructive/10 rounded-lg p-4 text-center">
+              <p className="text-sm text-destructive font-medium">Something went wrong</p>
+              <p className="text-xs text-muted-foreground mt-1">{error}</p>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { setError(null); setActiveSection('actions'); }}
+            >
+              Try Again
+            </Button>
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Preview */}
           <div className="bg-accent/50 rounded-lg p-3">
@@ -192,7 +223,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
 
           {/* Share URL - fixed overflow with proper containment */}
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0">
+            <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0 overflow-hidden">
               <p className="truncate">{shareUrl}</p>
             </div>
             <Button
@@ -333,6 +364,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
