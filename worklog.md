@@ -23,3 +23,26 @@ Stage Summary:
 - Chat history is now accessible (Conversation/ChatMessage tables created in production DB)
 - Both Conversations API and Chat History API have graceful fallback chains
 - Deployed to: https://sretracker.vercel.app
+---
+Task ID: 1
+Agent: Main Agent
+Task: Replace all API providers with Pollinations AI only
+
+Work Log:
+- Tested Pollinations AI API — OpenAI-compatible endpoint working again (was 502 earlier, now fixed)
+- Removed Gemini, OpenAI, OpenRouter providers from ai-provider.ts
+- Rewrote ai-provider.ts with Pollinations-only 3-tier fallback:
+  Tier 1: OpenAI-compatible chat endpoint (POST, best quality)
+  Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
+  Tier 3: Text endpoint (GET, simplest, most reliable)
+  Tier 4: Local fallback message (extreme failure only)
+- MAX_TOKENS = 4500
+- Removed GEMINI_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY from both Vercel projects
+- Committed and pushed to GitHub (commit ca15936)
+- Vercel daily deployment limit reached (100 deployments/day) — cannot deploy until reset
+
+Stage Summary:
+- ai-provider.ts now uses Pollinations AI only (free, no API key required)
+- Navigator bot still has preloaded local responses (instant, no API)
+- All previous fixes preserved: mobile alignment, chatbot route, estimate-macros/burn
+- Deployment blocked by Vercel free tier limit — user needs to redeploy from dashboard
