@@ -1,24 +1,31 @@
-// ── AI Provider — Pollinations AI (Authenticated) ──
+// ── AI Provider — Multi-Provider Graceful Degradation ──
 //
-// Provider: Pollinations AI
-//   Authentication: Bearer token via POLLINATIONS_API_KEY (sk_ key)
-//   Endpoint: https://text.pollinations.ai/openai/chat/completions (OpenAI-compatible)
-//   Model: openai (GPT-4o-mini via Pollinations)
+// Fallback chain:
+//   Tier 1: Gemini AI (Google generativelanguage API)
+//   Tier 2: OpenAI API (GPT-4o-mini)
+//   Tier 3: Pollinations AI (OpenAI-compatible, authenticated)
+//   Tier 4: Z.ai Production API (GLM-4-Plus, REST — NOT dev SDK)
+//   Tier 5: Local fallback message
 //
-// No graceful degradation — direct Pollinations AI call with API key.
+// Each tier is tried in sequence. If a tier fails (timeout, error, empty response),
+// the next tier is attempted automatically. This ensures AI features always work
+// even if individual providers have outages.
 
-const POLLINATIONS_CHAT_URL = 'https://text.pollinations.ai/openai/chat/completions';
 const MAX_TOKENS = 4500;
-const REQUEST_TIMEOUT_MS = 60000; // 60s for long responses
+const REQUEST_TIMEOUT_MS = 30000; // 30s per provider attempt
+const FALLBACK_ERROR = 'We are experiencing technical difficulties please try again later';
 
-// ── API Key ──
-function getApiKey(): string {
-  const key = process.env.POLLINATIONS_API_KEY;
-  if (!key) {
-    console.error('[AI] POLLINATIONS_API_KEY env var is NOT set!');
-  }
-  return key || '';
-}
+// ── API Endpoints ──
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const POLLINATIONS_URL = 'https://text.pollinations.ai/openai/chat/completions';
+const ZAI_URL = 'https://internal-api.z.ai/v1/chat/completions';
+
+// ── API Keys (from env vars) ──
+function getGeminiKey(): string | null { return process.env.GEMINI_API_KEY || null; }
+function getOpenAIKey(): string | null { return process.env.OPENAI_API_KEY || null; }
+function getPollinationsKey(): string | null { return process.env.POLLINATIONS_API_KEY || null; }
+function getZAIKey(): string | null { return process.env.ZAI_API_KEY || null; }
 
 // ── Timeout Helper ──
 function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
@@ -31,13 +38,111 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
 }
 
 // ═══════════════════════════════════════════════════════
-// Pollinations Chat Completion (Authenticated)
+// Tier 1: Gemini AI (Google Generative Language API)
+// ═══════════════════════════════════════════════════════
+async function geminiChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string | null> {
+  const apiKey = getGeminiKey();
+  if (!apiKey) return null; // Skip if no key configured
+
+  // Convert OpenAI-style messages to Gemini format
+  const contents = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+  // Inject system prompt as first user message if present
+  const systemMsg = messages.find(m => m.role === 'system');
+  if (systemMsg && contents.length > 0) {
+    contents[0].parts[0].text = `${systemMsg.content}\n\n${contents[0].parts[0].text}`;
+  }
+
+  const res = await withTimeout(
+    fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7,
+        },
+      }),
+    }),
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+
+  if (content) {
+    console.log(`[AI] OK provider=gemini tokens_est=${content.length}`);
+  } else {
+    console.error('[AI] Gemini returned empty:', JSON.stringify(data).slice(0, 200));
+  }
+
+  return content;
+}
+
+// ═══════════════════════════════════════════════════════
+// Tier 2: OpenAI API (GPT-4o-mini)
+// ═══════════════════════════════════════════════════════
+async function openaiChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string | null> {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) return null; // Skip if no key configured
+
+  const res = await withTimeout(
+    fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    }),
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || null;
+
+  if (content) {
+    console.log(`[AI] OK provider=openai model=gpt-4o-mini tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+  } else {
+    console.error('[AI] OpenAI returned empty:', JSON.stringify(data).slice(0, 200));
+  }
+
+  return content;
+}
+
+// ═══════════════════════════════════════════════════════
+// Tier 3: Pollinations AI (OpenAI-compatible, authenticated)
 // ═══════════════════════════════════════════════════════
 async function pollinationsChat(
   messages: { role: string; content: string }[],
   maxTokens = MAX_TOKENS,
 ): Promise<string | null> {
-  const apiKey = getApiKey();
+  const apiKey = getPollinationsKey();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -48,7 +153,7 @@ async function pollinationsChat(
   }
 
   const res = await withTimeout(
-    fetch(POLLINATIONS_CHAT_URL, {
+    fetch(POLLINATIONS_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -58,29 +163,116 @@ async function pollinationsChat(
         seed: 42,
       }),
     }),
-    REQUEST_TIMEOUT_MS,
   );
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    console.error(`[AI] Pollinations responded ${res.status}: ${errText.slice(0, 300)}`);
-    throw new Error(`Pollinations responded ${res.status}: ${errText.slice(0, 200)}`);
+    throw new Error(`Pollinations ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || null;
 
   if (content) {
-    console.log(`[AI] OK model=openai tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+    console.log(`[AI] OK provider=pollinations tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
   } else {
-    console.error('[AI] Pollinations returned empty content:', JSON.stringify(data).slice(0, 300));
+    console.error('[AI] Pollinations returned empty:', JSON.stringify(data).slice(0, 200));
   }
 
   return content;
 }
 
 // ═══════════════════════════════════════════════════════
-// Public: Chat completion
+// Tier 4: Z.ai Production API (GLM-4-Plus, REST direct)
+// Uses production SDK API key — NOT the dev SDK (z-ai-web-dev-sdk)
+// ═══════════════════════════════════════════════════════
+async function zaiChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string | null> {
+  const apiKey = getZAIKey();
+  if (!apiKey) return null; // Skip if no key configured
+
+  const res = await withTimeout(
+    fetch(ZAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'glm-4-plus',
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    }),
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Z.ai ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || null;
+
+  if (content) {
+    console.log(`[AI] OK provider=zai model=glm-4-plus tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+  } else {
+    console.error('[AI] Z.ai returned empty:', JSON.stringify(data).slice(0, 200));
+  }
+
+  return content;
+}
+
+// ═══════════════════════════════════════════════════════
+// Core: Multi-provider chat with graceful degradation
+// ═══════════════════════════════════════════════════════
+type ProviderFn = (messages: { role: string; content: string }[], maxTokens: number) => Promise<string | null>;
+
+interface ProviderTier {
+  name: string;
+  fn: ProviderFn;
+}
+
+function getProviderChain(): ProviderTier[] {
+  return [
+    { name: 'gemini', fn: geminiChat },
+    { name: 'openai', fn: openaiChat },
+    { name: 'pollinations', fn: pollinationsChat },
+    { name: 'zai', fn: zaiChat },
+  ];
+}
+
+async function multiProviderChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string> {
+  const providers = getProviderChain();
+  const errors: string[] = [];
+
+  for (const provider of providers) {
+    try {
+      const result = await provider.fn(messages, maxTokens);
+      if (result) {
+        return result;
+      }
+    } catch (e: any) {
+      const errMsg = e.message?.slice(0, 150) || 'unknown error';
+      errors.push(`${provider.name}: ${errMsg}`);
+      console.error(`[AI] ${provider.name} failed: ${errMsg}`);
+      // Continue to next provider
+    }
+  }
+
+  // All providers failed
+  console.error(`[AI] All providers failed. Errors: ${errors.join(' | ')}`);
+  return FALLBACK_ERROR;
+}
+
+// ═══════════════════════════════════════════════════════
+// Public: Chat completion with graceful degradation
 // ═══════════════════════════════════════════════════════
 export async function aiChat(
   messages: { role: string; content: string }[],
@@ -92,26 +284,11 @@ export async function aiChat(
     ...messages,
   ];
 
-  try {
-    const result = await pollinationsChat(allMessages, maxTokens);
-    if (result) return result;
-  } catch (e: any) {
-    console.error('[AI] aiChat failed:', e.message);
-  }
-
-  // Single retry on failure
-  try {
-    const result = await pollinationsChat(allMessages, maxTokens);
-    if (result) return result;
-  } catch (e: any) {
-    console.error('[AI] aiChat retry also failed:', e.message);
-  }
-
-  return 'I\'m having trouble connecting right now. Please try again in a moment.';
+  return multiProviderChat(allMessages, maxTokens);
 }
 
 // ═══════════════════════════════════════════════════════
-// Public: Structured JSON chat
+// Public: Structured JSON chat with graceful degradation
 // ═══════════════════════════════════════════════════════
 export async function aiStructuredChat<T>(
   messages: { role: string; content: string }[],
@@ -123,29 +300,21 @@ export async function aiStructuredChat<T>(
     ...messages,
   ];
 
-  try {
-    const content = await pollinationsChat(allMessages, maxTokens);
-    if (content) {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (match) {
-        return JSON.parse(match[0]) as T;
-      }
-    }
-  } catch (e: any) {
-    console.error('[AI] aiStructuredChat failed:', e.message);
-  }
+  const providers = getProviderChain();
 
-  // Single retry
-  try {
-    const content = await pollinationsChat(allMessages, maxTokens);
-    if (content) {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (match) {
-        return JSON.parse(match[0]) as T;
+  for (const provider of providers) {
+    try {
+      const content = await provider.fn(allMessages, maxTokens);
+      if (content) {
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) {
+          return JSON.parse(match[0]) as T;
+        }
       }
+    } catch (e: any) {
+      console.error(`[AI] aiStructuredChat ${provider.name} failed:`, e.message?.slice(0, 100));
+      // Continue to next provider
     }
-  } catch (e: any) {
-    console.error('[AI] aiStructuredChat retry failed:', e.message);
   }
 
   return null;
@@ -273,18 +442,18 @@ export function getNavigatorResponse(userMessage: string): string | null {
     [/workout|exercise|gym|fitness log/i, 'You can log workouts and track fitness in the **Fitness** section! Go to **/fitness** to:\n- Log workouts with duration and type\n- Track meals and nutrition\n- View progress charts\n- Get AI macro and calorie burn estimates'],
     [/learn|study|track.*learn|learning/i, 'Track your learning in the **Learn** section at **/learn**! You can:\n- Create learning topics\n- Log study entries with time spent\n- Track progress with charts\n- Share topics with others'],
     [/achievements?|badge|trophy/i, 'View your achievements at **/achievements**! The SRE platform has 100+ badges across learning, fitness, time, and content. Badges range from bronze to platinum based on your milestones.'],
-    [/content|script|series|post|publish/i, 'Content creation tools are in the **Content** section at **/content**! You can:\n- Manage content series\n- Track pipeline stages (idea → drafting → editing → published)\n- Get AI script reviews\n- Find best posting times'],
+    [/content|script|series|post|publish/i, 'Content creation tools are in the **Content** section at **/content**! You can:\n- Manage content series\n- Track pipeline stages (idea \u2192 drafting \u2192 editing \u2192 published)\n- Get AI script reviews\n- Find best posting times'],
     [/task|todo|productivity|focus|time manage/i, 'Manage tasks and focus in the **Time** section at **/time**! Features include:\n- Create tasks with priorities\n- Focus timer (Pomodoro-style)\n- Day planner with AI rating\n- Task classification (productive/unproductive)'],
-    [/dashboard|home|overview|summary/i, 'Your personalized dashboard is at **/home** — it shows your activity summary, stats, quick actions, and recent progress across all areas.'],
+    [/dashboard|home|overview|summary/i, 'Your personalized dashboard is at **/home** \u2014 it shows your activity summary, stats, quick actions, and recent progress across all areas.'],
     [/analytics|chart|stats|data|progress/i, 'Visual dashboards are at **/analytics**! View charts for learning progress, fitness trends, and focus data across different time periods.'],
     [/profile|account|settings|preferences/i, 'Access your profile at **/profile** and settings at **/settings**. Your profile shows stats, achievements, and activity. Settings has account preferences.'],
-    [/social|feed|follow|discover|community/i, 'Social features include:\n- **/feed** — See posts from people you follow\n- **/discover** — Find new users and content\n- **/leaderboard** — Community XP rankings'],
-    [/message|chat|dm|friend/i, 'Communication features:\n- **/messages** — Direct messages and group chats\n- **/friends** — Your friends list\n- **/notifications** — Activity notifications'],
+    [/social|feed|follow|discover|community/i, 'Social features include:\n- **/feed** \u2014 See posts from people you follow\n- **/discover** \u2014 Find new users and content\n- **/leaderboard** \u2014 Community XP rankings'],
+    [/message|chat|dm|friend/i, 'Communication features:\n- **/messages** \u2014 Direct messages and group chats\n- **/friends** \u2014 Your friends list\n- **/notifications** \u2014 Activity notifications'],
     [/ai|assistant|hub|chat/i, 'The **AI Hub** at **/ai-hub** is your unified AI chat center! Choose from 6 specialized assistants:\n- Main Assistant (general)\n- Learning Tutor\n- Fitness Coach\n- Productivity Coach\n- Content Assistant\n- Platform Navigator'],
-    [/phase|start|restart|explore|onboard/i, 'SRE uses a **Phase system**:\n- **Start** — Begin something new\n- **Restart** — Return to paused goals\n- **Explore** — Discover new interests\n\nVisit **/onboarding** to set up your phases and interests.'],
+    [/phase|start|restart|explore|onboard/i, 'SRE uses a **Phase system**:\n- **Start** \u2014 Begin something new\n- **Restart** \u2014 Return to paused goals\n- **Explore** \u2014 Discover new interests\n\nVisit **/onboarding** to set up your phases and interests.'],
     [/xp|level|rank|point/i, 'The **XP System** rewards every activity! Earn XP for logging workouts, studying, creating content, and more. Level up with increasing thresholds. Check your rank at **/leaderboard**.'],
     [/streak|daily|consecutive|quest/i, 'Track **Streaks** for consecutive active days and complete **Daily Quests** for bonus XP! Both appear on your dashboard at **/home**.'],
-    [/navigate|how.*find|where.*go|where.*is|how.*use|help.*use/i, 'I can help you navigate! The SRE platform has these main sections:\n\n- **/home** — Dashboard\n- **/learn** — Learning tracker\n- **/fitness** — Fitness & nutrition\n- **/content** — Content creation\n- **/time** — Tasks & focus\n- **/ai-hub** — AI assistants\n- **/analytics** — Data dashboards\n- **/achievements** — Badges\n\nWhat would you like to find?'],
+    [/navigate|how.*find|where.*go|where.*is|how.*use|help.*use/i, 'I can help you navigate! The SRE platform has these main sections:\n\n- **/home** \u2014 Dashboard\n- **/learn** \u2014 Learning tracker\n- **/fitness** \u2014 Fitness & nutrition\n- **/content** \u2014 Content creation\n- **/time** \u2014 Tasks & focus\n- **/ai-hub** \u2014 AI assistants\n- **/analytics** \u2014 Data dashboards\n- **/achievements** \u2014 Badges\n\nWhat would you like to find?'],
     [/hello|hi|hey|greet/i, 'Hello! I\'m the SRE Navigator, your guide to the platform. Ask me anything about where to find features, how to use tools, or what each section does!'],
     [/thank|thanks/i, 'You\'re welcome! If you need any more help navigating the SRE platform, just ask. I\'m always here to help!'],
   ];
@@ -310,27 +479,24 @@ export async function aiQuickCall(
     { role: 'user', content: userPrompt },
   ];
 
-  try {
-    const result = await pollinationsChat(messages, maxTokens);
-    if (result) return result;
-  } catch (e: any) {
-    console.error('[AI] aiQuickCall failed:', e.message);
-  }
+  const providers = getProviderChain();
 
-  // Single retry
-  try {
-    const result = await pollinationsChat(messages, maxTokens);
-    if (result) return result;
-  } catch (e: any) {
-    console.error('[AI] aiQuickCall retry failed:', e.message);
+  for (const provider of providers) {
+    try {
+      const result = await provider.fn(messages, maxTokens);
+      if (result) return result;
+    } catch (e: any) {
+      console.error(`[AI] aiQuickCall ${provider.name} failed:`, e.message?.slice(0, 100));
+      // Continue to next provider
+    }
   }
 
   return null;
 }
 
 // ═══════════════════════════════════════════════════════
-// Public: Check if API key is configured
+// Public: Check if any API key is configured
 // ═══════════════════════════════════════════════════════
 export function isApiKeyConfigured(): boolean {
-  return !!getApiKey();
+  return !!(getGeminiKey() || getOpenAIKey() || getPollinationsKey() || getZAIKey());
 }
