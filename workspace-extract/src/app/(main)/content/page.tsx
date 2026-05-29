@@ -79,6 +79,7 @@ export default function ContentPage() {
   const [chatMessages, setChatMessages] = useState<{role:string;content:string}[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string|null>(null);
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [seriesDetail, setSeriesDetail] = useState<any>(null);
@@ -171,7 +172,12 @@ export default function ContentPage() {
 
   async function sendChat() {
     if (!chatInput.trim()) return; const msg = chatInput.trim(); setChatMessages(p => [...p, { role: 'user', content: msg }]); setChatInput(''); setChatLoading(true);
-    try { const r = await fetch('/api/ai/chatbot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, botType: 'content' }) }); if (r.ok) { const d = await r.json(); setChatMessages(p => [...p, { role: 'assistant', content: d.reply || d.response }]); } } catch {} finally { setChatLoading(false); }
+    try { const r = await fetch('/api/ai/chatbot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, botType: 'content', conversationId }) }); if (r.ok) { const d = await r.json(); setChatMessages(p => [...p, { role: 'assistant', content: d.reply || d.response }]); if (d.conversationId) setConversationId(d.conversationId); } } catch {} finally { setChatLoading(false); }
+  }
+
+  function startNewChat() {
+    setChatMessages([]);
+    setConversationId(null);
   }
 
   const published = entries.filter((e: any) => e.status === 'published');
@@ -583,7 +589,7 @@ export default function ContentPage() {
         {/* ═══ AI ASSISTANT TAB ═══ */}
         <TabsContent value="aiAssistant" className="space-y-4 mt-4">
           <GlassCard className="p-4 h-[500px] flex flex-col">
-            <div className="flex items-center gap-2 mb-3"><Bot size={18} className="text-purple-400" /><span className="text-sm font-medium text-foreground">{t('content.aiAssistant')}</span></div>
+            <div className="flex items-center gap-2 mb-3"><Bot size={18} className="text-purple-400" /><span className="text-sm font-medium text-foreground">{t('content.aiAssistant')}</span><button onClick={startNewChat} className="ml-auto text-xs text-muted-foreground hover:text-blue-400 flex items-center gap-1"><Plus size={12} />New Chat</button></div>
             <div className="flex-1 overflow-y-auto space-y-3 mb-3">
               {chatMessages.map((msg, i) => <div key={i} className={`flex items-end ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>{msg.role === 'assistant' && <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20"><Bot size={11} className="text-white" /></div>}<div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 text-foreground rounded-bl-md border border-violet-400/20 dark:border-violet-400/30'}`}>{msg.role === 'assistant' ? <AIMessage content={msg.content} /> : msg.content}</div></div>)}
               {chatLoading && <div className="flex justify-start items-end"><div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mr-1.5 shadow-md shadow-violet-500/20"><Bot size={11} className="text-white" /></div><div className="bg-gradient-to-br from-violet-600/20 to-indigo-600/10 dark:from-violet-500/25 dark:to-indigo-500/15 rounded-2xl px-4 py-2 text-sm text-muted-foreground border border-violet-400/20 dark:border-violet-400/30">{t('ai.thinking')}</div></div>}

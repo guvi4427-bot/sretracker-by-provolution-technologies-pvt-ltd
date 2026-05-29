@@ -88,6 +88,7 @@ const translations: Translations = {
     "nav.admin": "Admin Dashboard",
     "nav.more": "More",
     "nav.signOut": "Sign Out",
+    "nav.aiHub": "AI Hub",
     
     // Phases
     "phase.start": "Start",
@@ -523,6 +524,7 @@ const translations: Translations = {
     "nav.admin": "நிர்வாக டாஷ்போர்டு",
     "nav.more": "மேலும்",
     "nav.signOut": "வெளியேறு",
+    "nav.aiHub": "AI மையம்",
     
     // Phases
     "phase.start": "தொடங்கு",

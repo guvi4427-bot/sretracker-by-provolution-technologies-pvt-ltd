@@ -38,6 +38,7 @@ const BOTTOM_TABS = [
 ];
 
 const MORE_ITEMS = [
+  { nameKey: 'nav.aiHub', href: '/ai-hub', icon: Bot },
   { nameKey: 'nav.learning', href: '/learn', icon: BookOpen },
   { nameKey: 'nav.fitness', href: '/fitness', icon: Dumbbell },
   { nameKey: 'nav.content', href: '/content', icon: PenTool },

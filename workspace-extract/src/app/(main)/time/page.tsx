@@ -51,6 +51,7 @@ export default function TimePage() {
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string|null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(today);
@@ -191,10 +192,15 @@ export default function TimePage() {
     try {
       const r = await fetch('/api/ai/chatbot', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, botType: 'time' }),
+        body: JSON.stringify({ message: userMsg, botType: 'time', conversationId }),
       });
-      if (r.ok) { const d = await r.json(); setChatMessages(p => [...p, { role: 'assistant', content: d.reply || d.response }]); }
+      if (r.ok) { const d = await r.json(); setChatMessages(p => [...p, { role: 'assistant', content: d.reply || d.response }]); if (d.conversationId) setConversationId(d.conversationId); }
     } catch {} finally { setChatLoading(false); }
+  }
+
+  function startNewChat() {
+    setChatMessages([]);
+    setConversationId(null);
   }
 
   async function rankUnproductive() {
@@ -520,7 +526,7 @@ export default function TimePage() {
         {/* AI Coach Tab */}
         <TabsContent value="aiCoach" className="space-y-4 mt-4">
           <GlassCard className="p-4 h-[500px] flex flex-col">
-            <div className="flex items-center gap-2 mb-3"><Bot size={18} className="text-purple-400" /><span className="text-sm font-medium text-foreground">{t('time.aiCoach')}</span></div>
+            <div className="flex items-center gap-2 mb-3"><Bot size={18} className="text-purple-400" /><span className="text-sm font-medium text-foreground">{t('time.aiCoach')}</span><button onClick={startNewChat} className="ml-auto text-xs text-muted-foreground hover:text-blue-400 flex items-center gap-1"><Plus size={12} />New Chat</button></div>
             <div className="flex-1 overflow-y-auto space-y-3 mb-3">
               {chatMessages.length === 0 && <p className="text-center text-muted-foreground/50 py-8 text-sm">{t('ai.askAnything')}</p>}
               {chatMessages.map((msg, i) => (

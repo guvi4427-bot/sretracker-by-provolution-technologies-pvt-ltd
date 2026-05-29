@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { aiChat } from '@/lib/ai-provider';
+import { aiChat, generateTitle } from '@/lib/ai-provider';
 import { db } from '@/lib/db';
 
 export async function POST(req: Request) {
@@ -9,12 +9,13 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { message, botType, history, conversationId } = await req.json();
+    const { message, botType, conversationId } = await req.json();
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
 
     const userId = session.user.id;
+    const agentType = botType || 'general';
 
-    // ── System Prompts (Phase 2: No forced concise, detailed responses) ──
+    // ── System Prompts (detailed, no forced concise) ──
     const systemPrompts: Record<string, string> = {
       learning: `You are a helpful learning assistant for the SRE (Start·Restart·Explore) platform. Help users study effectively, explain concepts clearly, suggest learning strategies, and create study roadmaps.
 
@@ -112,111 +113,153 @@ You can help with:
 - Navigating the SRE platform features`,
     };
 
-    const selectedPrompt = systemPrompts[botType || 'general'] || systemPrompts.general;
+    const selectedPrompt = systemPrompts[agentType] || systemPrompts.general;
 
-    // ── Phase 7: Context-Aware Memory (15 exchange window) ──
-    // Load recent conversation history from DB if no history provided
-    let conversationHistory = history || [];
+    // ── Load or create conversation ──
+    let conversation: any = null;
+    let contextMessages: { role: string; content: string }[] = [];
 
-    if (!history || history.length === 0) {
-      // Try loading from DB
-      try {
-        const existingChat = conversationId
-          ? await db.chatHistory.findUnique({ where: { id: conversationId } })
-          : await db.chatHistory.findFirst({
-              where: { userId, botType: botType || 'general' },
-              orderBy: { updatedAt: 'desc' },
-            });
+    if (conversationId) {
+      // Load existing conversation
+      conversation = await db.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 30, // Last 15 exchanges (30 messages)
+          },
+        },
+      });
 
-        if (existingChat) {
-          try {
-            const dbMessages = JSON.parse(existingChat.messages);
-            // Take last 15 exchanges (30 messages: 15 user + 15 assistant)
-            conversationHistory = dbMessages.slice(-30);
-          } catch { /* ignore parse errors */ }
-        }
-      } catch { /* DB not available yet, continue without history */ }
+      if (conversation && conversation.userId === userId) {
+        // Reverse to get chronological order (oldest first)
+        contextMessages = [...conversation.messages].reverse().map((m: any) => ({
+          role: m.role,
+          content: m.content,
+        }));
+      }
     }
 
-    // Build messages with context window
+    // If no conversation found, check for recent conversation within 30 min
+    if (!conversation) {
+      const recentConv = await db.conversation.findFirst({
+        where: {
+          userId,
+          aiAgentType: agentType,
+          updatedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+        },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 30,
+          },
+        },
+      });
+
+      if (recentConv) {
+        conversation = recentConv;
+        contextMessages = [...recentConv.messages].reverse().map((m: any) => ({
+          role: m.role,
+          content: m.content,
+        }));
+      }
+    }
+
+    // Build messages with context window (rolling 15 exchanges = 30 messages max)
     const messages = [
-      ...conversationHistory.slice(-30).map((m: any) => ({ role: m.role, content: m.content })),
+      ...contextMessages.slice(-30),
       { role: 'user', content: message },
     ];
 
     const reply = await aiChat(messages, selectedPrompt);
 
-    // ── Phase 6: Persistent Chat History ──
-    // Save the conversation to database
+    // ── Save conversation ──
+    let savedConversationId = conversationId;
+
     try {
-      if (conversationId) {
-        // Update existing conversation
-        const existing = await db.chatHistory.findUnique({ where: { id: conversationId } });
-        if (existing && existing.userId === userId) {
-          const existingMessages = JSON.parse(existing.messages);
+      if (conversation) {
+        // Add messages to existing conversation
+        await db.chatMessage.createMany({
+          data: [
+            { conversationId: conversation.id, role: 'user', content: message },
+            { conversationId: conversation.id, role: 'assistant', content: reply },
+          ],
+        });
+
+        // Generate title if this is the first message
+        if (conversation.title === 'New Conversation') {
+          const title = await generateTitle(message);
+          await db.conversation.update({
+            where: { id: conversation.id },
+            data: { title, updatedAt: new Date() },
+          });
+        } else {
+          await db.conversation.update({
+            where: { id: conversation.id },
+            data: { updatedAt: new Date() },
+          });
+        }
+
+        savedConversationId = conversation.id;
+      } else {
+        // Create new conversation
+        const title = await generateTitle(message);
+        const newConv = await db.conversation.create({
+          data: {
+            userId,
+            aiAgentType: agentType,
+            title,
+            messages: {
+              create: [
+                { role: 'user', content: message },
+                { role: 'assistant', content: reply },
+              ],
+            },
+          },
+        });
+        savedConversationId = newConv.id;
+      }
+    } catch (dbError) {
+      console.error('Conversation save error:', dbError);
+      // Fallback: try saving to legacy ChatHistory
+      try {
+        const existingChat = await db.chatHistory.findFirst({
+          where: { userId, botType: agentType },
+          orderBy: { updatedAt: 'desc' },
+        });
+
+        if (existingChat) {
+          const existingMessages = JSON.parse(existingChat.messages);
           const updatedMessages = [
             ...existingMessages,
             { role: 'user', content: message, timestamp: new Date().toISOString() },
             { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
           ];
           await db.chatHistory.update({
-            where: { id: conversationId },
+            where: { id: existingChat.id },
+            data: { messages: JSON.stringify(updatedMessages.slice(-200)), updatedAt: new Date() },
+          });
+          savedConversationId = savedConversationId || existingChat.id;
+        } else {
+          const newChat = await db.chatHistory.create({
             data: {
-              messages: JSON.stringify(updatedMessages.slice(-200)),
-              updatedAt: new Date(),
+              userId,
+              botType: agentType,
+              messages: JSON.stringify([
+                { role: 'user', content: message, timestamp: new Date().toISOString() },
+                { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
+              ]),
             },
           });
+          savedConversationId = savedConversationId || newChat.id;
         }
-      } else {
-        // Check if we should append to recent conversation or create new
-        const recentChat = await db.chatHistory.findFirst({
-          where: { userId, botType: botType || 'general' },
-          orderBy: { updatedAt: 'desc' },
-        });
-
-        if (recentChat) {
-          const existingMessages = JSON.parse(recentChat.messages);
-          const lastMsgTime = existingMessages.length > 0
-            ? new Date(existingMessages[existingMessages.length - 1]?.timestamp || 0)
-            : new Date(0);
-          const minutesSinceLastMsg = (Date.now() - lastMsgTime.getTime()) / 60000;
-
-          if (minutesSinceLastMsg < 30) {
-            const updatedMessages = [
-              ...existingMessages,
-              { role: 'user', content: message, timestamp: new Date().toISOString() },
-              { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
-            ];
-            await db.chatHistory.update({
-              where: { id: recentChat.id },
-              data: {
-                messages: JSON.stringify(updatedMessages.slice(-200)),
-                updatedAt: new Date(),
-              },
-            });
-            return NextResponse.json({ reply, response: reply, conversationId: recentChat.id });
-          }
-        }
-
-        // Create new conversation
-        const newChat = await db.chatHistory.create({
-          data: {
-            userId,
-            botType: botType || 'general',
-            messages: JSON.stringify([
-              { role: 'user', content: message, timestamp: new Date().toISOString() },
-              { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
-            ]),
-          },
-        });
-        return NextResponse.json({ reply, response: reply, conversationId: newChat.id });
+      } catch (legacyError) {
+        console.error('Legacy chat history save error:', legacyError);
       }
-    } catch (dbError) {
-      console.error('Chat history save error:', dbError);
-      // Don't fail the response if DB save fails
     }
 
-    return NextResponse.json({ reply, response: reply, conversationId });
+    return NextResponse.json({ reply, response: reply, conversationId: savedConversationId });
   } catch (error) {
     console.error('AI chatbot error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

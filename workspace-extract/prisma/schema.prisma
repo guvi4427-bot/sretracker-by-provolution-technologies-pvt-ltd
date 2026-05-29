@@ -54,6 +54,7 @@ model User {
   postReportsMade    PostReport[]        @relation("PostReporter")
   commentReportsMade CommentReport[]     @relation("CommentReporter")
   chatHistories      ChatHistory[]
+  conversations      Conversation[]
 
   following   Follow[]  @relation("Following")
   followers   Follow[]  @relation("Followers")
@@ -644,7 +645,7 @@ model Feedback {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ─── AI Chat History ───
+// ─── AI Chat History (legacy, kept for backward compat) ───
 
 model ChatHistory {
   id        String   @id @default(cuid())
@@ -655,6 +656,35 @@ model ChatHistory {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── AI Conversations (new ChatGPT-style system) ───
+
+model Conversation {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String   @default("New Conversation")
+  aiAgentType String   @default("general") // general, learning, fitness, content, time, navigation
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, aiAgentType])
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user, assistant
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 // ─── Audit Log ───

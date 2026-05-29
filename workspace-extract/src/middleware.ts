@@ -4,7 +4,7 @@ import { getToken } from "next-auth/jwt";
 
 // Paths that are always public (no auth required)
 const PUBLIC_PATHS = [
-  "/", "/login", "/signup", "/terms", "/privacy", "/about", "/contact",
+  "/", "/login", "/signup", "/landing", "/terms", "/privacy", "/about", "/contact",
   "/community-guidelines", "/api/auth", "/api/health", "/_next",
   "/favicon", "/favicon-96x96.png", "/favicon.ico", "/apple-touch-icon.png",
   "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png",
