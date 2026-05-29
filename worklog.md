@@ -73,3 +73,26 @@ Stage Summary:
 - All Vercel env vars updated on both PIDs
 - Old API keys completely removed
 - Git push successful, auto-deploy pending (rate limited)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix build failures and deploy Pollinations AI with sk key to Vercel
+
+Work Log:
+- Discovered TWO root causes for Vercel build failures:
+  1. Missing `src/components/share-to-chat-dialog.tsx` — imported by feed and discover pages but never created
+  2. `npm install` in buildCommand was running twice, causing Vercel to prune devDependencies including `@tailwindcss/postcss`
+- Created ShareToChatDialog component with proper interface (ShareData type, Dialog props)
+- Fixed vercel.json: removed duplicate `npm install` from buildCommand (now `npx prisma generate && next build`)
+- First commit missed the component file (git workspace confusion with nested repos)
+- Force-added the file with `git add -f` and committed again
+- Pushed to GitHub, auto-deploy triggered for both PIDs
+- Both PIDs deployed successfully: READY state
+
+Stage Summary:
+- Build errors fixed: share-to-chat-dialog created, devDependencies preserved
+- PID 1: sretracker.vercel.app — READY
+- PID 2: workspace-extract project — READY
+- Pollinations AI with sk key auth is live on production
+- Git pushed: commit 50e251c
