@@ -1,14 +1,17 @@
-// ── AI Provider — Pollinations AI (Free, No Key Required) ──
+// ── AI Provider — Pollinations AI (Authenticated) ──
 //
 // Provider: Pollinations AI
-//   Tier 1: OpenAI-compatible chat endpoint (POST, best quality)
-//   Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
-//   Tier 3: Text endpoint (GET, simplest, most reliable)
-//   Tier 4: Local fallback message (extreme failure only)
+//   Authentication: Bearer token via POLLINATIONS_API_KEY (sk_ key)
+//   Endpoint: https://text.pollinations.ai/openai (OpenAI-compatible)
+//   Fallback chain:
+//     Tier 1: Authenticated chat endpoint (POST, best quality)
+//     Tier 2: Lightweight prompt retry (trimmed, fewer tokens)
+//     Tier 3: Text endpoint (GET, simplest, most reliable)
+//     Tier 4: Local fallback message (extreme failure only)
 //
 // Features:
 //   - maxTokens = 4500
-//   - Free, no API key required
+//   - API key authentication via POLLINATIONS_API_KEY env var
 //   - Server-side only
 //   - Navigator bot: preloaded local responses (instant, no API call)
 //   - Telemetry: provider, latency, tokens, retry count, errors
@@ -17,7 +20,12 @@ const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
 const POLLINATIONS_TEXT = 'https://text.pollinations.ai/';
 
 const MAX_TOKENS = 4500;
-const REQUEST_TIMEOUT_MS = 25000;
+const REQUEST_TIMEOUT_MS = 30000; // Slightly longer with auth
+
+// ── API Key ──
+function getApiKey(): string | null {
+  return process.env.POLLINATIONS_API_KEY || null;
+}
 
 // ── Telemetry Types ──
 export interface AITelemetry {
@@ -79,15 +87,26 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
 }
 
 // ═══════════════════════════════════════════════════════
-// Pollinations OpenAI-compatible chat endpoint
+// Pollinations OpenAI-compatible chat endpoint (Authenticated)
 // ═══════════════════════════════════════════════════════
 async function pollinationsChat(
   messages: { role: string; content: string }[],
   maxTokens = MAX_TOKENS,
 ): Promise<{ content: string | null; tokensIn: number; tokensOut: number }> {
+  const apiKey = getApiKey();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add Authorization header if API key is available
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
   const res = await fetch(POLLINATIONS_OPENAI, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       model: 'openai',
       messages,
@@ -112,13 +131,23 @@ async function pollinationsChat(
 }
 
 // ═══════════════════════════════════════════════════════
-// Pollinations text endpoint (GET, simplest, most reliable)
+// Pollinations text endpoint (GET, with auth if available)
 // ═══════════════════════════════════════════════════════
 async function pollinationsText(prompt: string): Promise<string | null> {
+  const apiKey = getApiKey();
   const encoded = encodeURIComponent(prompt.slice(0, 2000));
+
+  const headers: Record<string, string> = {
+    'Accept': 'text/plain',
+  };
+
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
   const res = await fetch(`${POLLINATIONS_TEXT}${encoded}`, {
     method: 'GET',
-    headers: { 'Accept': 'text/plain' },
+    headers,
   });
   if (!res.ok) throw new Error(`Pollinations text responded ${res.status}`);
   const text = await res.text();
@@ -174,7 +203,7 @@ export async function aiChat(
   ];
 
   const providers: Array<() => Promise<{ result: string | null; telemetry: AITelemetry }>> = [
-    // Tier 1: Full Pollinations chat (best quality)
+    // Tier 1: Full Pollinations chat (authenticated, best quality)
     () => attemptProvider('pollinations', 'openai', async () => {
       const r = await pollinationsChat(allMessages, maxTokens);
       return r.content;
@@ -423,18 +452,25 @@ export async function aiQuickCall(
     { role: 'user', content: userPrompt },
   ];
 
-  // Try OpenAI endpoint first
+  // Try authenticated chat endpoint first
   try {
-    const r = await withTimeout(pollinationsChat(messages, maxTokens), 8000);
+    const r = await withTimeout(pollinationsChat(messages, maxTokens), 10000);
     if (r.content) return r.content;
   } catch {}
 
   // Fallback to text endpoint
   try {
     const prompt = `${systemPrompt}\n\n${userPrompt}`;
-    const result = await withTimeout(pollinationsText(prompt), 8000);
+    const result = await withTimeout(pollinationsText(prompt), 10000);
     if (result) return result;
   } catch {}
 
   return null;
+}
+
+// ═══════════════════════════════════════════════════════
+// Public: Check if API key is configured
+// ═══════════════════════════════════════════════════════
+export function isApiKeyConfigured(): boolean {
+  return !!getApiKey();
 }
