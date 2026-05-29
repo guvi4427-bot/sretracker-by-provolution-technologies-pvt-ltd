@@ -1,26 +1,29 @@
 ---
 Task ID: 1
-Agent: main
-Task: Fix multiple issues - SEO crawlability, blog page, share dialog, rich card actions, bookmark/report
+Agent: Main Agent
+Task: Fix share button "something went wrong" error, make blog page accessible, add crawler bot support, deploy to Vercel
 
 Work Log:
-- Added LiveUpdateBookmark model to Prisma schema with unique constraint and index
-- Created `/api/live-updates/[updateId]/bookmark` API route (POST/DELETE)
-- Updated `/api/feed/live-updates` to include bookmark counts and isBookmarked for all entity types
-- Fixed share dialog: type-aware URLs (post→/feed, learning→/shared-topic, content→/discover#content, fitness→/discover#fitness), added error boundary, fixed link overflow
-- Added bookmark + report buttons to ContentLiveUpdateCard, FitnessLiveUpdateCard, LearningLiveUpdateCard in feed page
-- Added bookmark + report buttons to DiscoverContentCard, DiscoverFitnessCard, DiscoverLearningCard in discover page
-- Added report dialog to discover page
-- Updated robots.ts with 10+ new bot user agents (Googlebot-News, Googlebot-Video, AdsBot-Google, Bytespider, Applebot, YandexBot, Discordbot, Slackbot, LinkedInBot, SemrushBot)
-- Updated sitemap.xml with 7 new pages (/blog, /leaderboard, /ai-hub, /fitness, /learn, /content, /landing)
-- Created /blog page with SEO metadata, ad banners, category filtering, search
-- Added Blog link to footer in app-shell, guest-shell, and landing page
-- Built project successfully (next build passes)
-- Pushed to git (main branch, commit 3d88d76 + 0ebd675 trigger commit)
-- Vercel API rate-limited (100/day limit reached), deployments will trigger via git auto-deploy
+- Investigated share dialog "something went wrong" error root cause
+- Found ShareToChatDialog had error state declared but never set (setError was never called)
+- Fixed ShareToChatDialog to properly set error state on API failures
+- Made dialog always render Dialog component (removed early return on null shareData) to prevent ErrorBoundary crashes
+- Added proper error handling for share-to-chat and share-to-group with descriptive error messages
+- Added handleClose() function that resets error state and active section
+- Added break-all to share URL display and disabled copy button when URL is empty
+- Added try-catch around getShareUrl function
+- Added /blog to PUBLIC_PATHS in middleware (was missing, causing bots/unauthenticated users to be redirected to landing)
+- Added crawler bot detection (Googlebot, GPTBot, ClaudeBot, Anthropic-ai, etc.) to middleware for SEO indexing
+- Crawlers can now access feed, discover, and profile pages for indexing
+- Verified blog page already exists with proper SEO metadata, ad banners, and sitemap entry
+- Verified footer already has blog link in both app-shell and guest-shell
+- Build succeeded with no errors
+- Pushed changes to git (commit: af22626)
+- Deployed to Vercel via git push auto-deploy (sre-growth-platform project, Status: Ready)
 
 Stage Summary:
-- All code changes committed and pushed to git
-- Schema changes will auto-apply via `npx prisma db push` in Vercel build command
-- Deployments pending Vercel rate limit reset (~24 hours)
-- Build compiles cleanly with all new features
+- Share dialog now properly handles errors instead of causing page crashes
+- Blog page is now accessible to unauthenticated users and bots
+- Crawler bots (Google, OpenAI, Anthropic, etc.) can now index feed/discover/profile pages
+- All changes deployed to: https://sre-growth-platform-gowtham-s-projects107.vercel.app
+- CLI direct deployment hit Vercel free tier daily limit (100+ deploys), but git auto-deploy succeeded
