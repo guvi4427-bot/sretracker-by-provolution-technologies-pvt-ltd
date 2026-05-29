@@ -35,6 +35,7 @@ const GUEST_ALLOWED_PATHS = [
   "/feed",
   "/discover",
   "/shared-topic",
+  "/blog",
 ];
 
 // API routes that guests can access (read-only public data)
@@ -46,6 +47,7 @@ const GUEST_ALLOWED_API_PATHS = [
   "/api/posts",      // GET only — POST is blocked at the API level
   "/api/learning/topic",  // GET only — for shared topic viewing
   "/api/learning/topic/", // GET specific topic by ID
+  "/api/blogs",      // GET only — POST/DELETE blocked at API level
 ];
 
 export async function middleware(request: NextRequest) {
@@ -89,7 +91,8 @@ export async function middleware(request: NextRequest) {
         const isCrawlerAllowedPath =
           GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) ||
           pathname.startsWith("/profile/") ||
-          pathname.startsWith("/shared-topic/");
+          pathname.startsWith("/shared-topic/") ||
+          pathname.startsWith("/blog/");
         if (isCrawlerAllowedPath) {
           const response = NextResponse.next();
           response.headers.set("x-guest", "true");

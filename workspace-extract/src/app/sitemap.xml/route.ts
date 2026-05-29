@@ -81,8 +81,8 @@ function buildSitemap(): string {
     {
       loc: `${SITE_URL}/blog`,
       lastmod: now,
-      changefreq: "weekly",
-      priority: "0.8",
+      changefreq: "daily",
+      priority: "0.9",
     },
     {
       loc: `${SITE_URL}/leaderboard`,
