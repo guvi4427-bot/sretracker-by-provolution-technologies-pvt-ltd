@@ -5,10 +5,10 @@
 //   Tier 2: Pollinations Mistral (free, no key)
 //   Tier 3: Lightweight prompt retry (shorter messages)
 //   Tier 4: Pollinations text endpoint (simplest, always works)
-//   Tier 5: z-ai-web-dev-sdk (works inside Z.AI hosting)
+//   Tier 5: z-ai (DISABLED — npm import crashes site)
 //
 // Features:
-//   - maxTokens = 25000 (was 500 → 5000 — allows comprehensive, detailed responses)
+//   - maxTokens = 8000 (was 500 → 5000 → 25000 caused failures, 8000 is safe & generous)
 //   - Retry logic: current provider → lightweight prompt → backup provider → emergency
 //   - Telemetry: provider, latency, tokens, retry count, errors
 //   - No hardcoded "I'm having trouble" fallbacks — retries instead
@@ -18,7 +18,7 @@ const POLLINATIONS_OPENAI = 'https://text.pollinations.ai/openai';
 const POLLINATIONS_TEXT   = 'https://text.pollinations.ai/';
 
 const REQUEST_TIMEOUT_MS = 25000;
-const MAX_TOKENS = 25000; // Was 500 → 5000 → 25000 — allows comprehensive, detailed responses
+const MAX_TOKENS = 8000; // 25000 caused Pollinations failures; 8000 is safe & allows detailed responses
 
 // ── Telemetry Types ──
 export interface AITelemetry {
@@ -125,26 +125,17 @@ async function pollinationsText(prompt: string): Promise<string | null> {
   return text?.trim() || null;
 }
 
-// ── Tier 5: z-ai-web-dev-sdk (lazy-loaded, only used as last resort) ──
+// ── Tier 5: z-ai-web-dev-sdk ──
+// NOTE: Importing z-ai-web-dev-sdk as npm package CRASHES the entire site.
+// If z.ai is needed, use fetch() to call the API endpoint directly.
+// For now, Tier 4 (Pollinations text) is the last resort.
 async function zaiChat(
-  messages: { role: string; content: string }[],
-  systemPrompt?: string,
+  _messages: { role: string; content: string }[],
+  _systemPrompt?: string,
 ): Promise<string | null> {
-  try {
-    // Dynamic import to avoid build-time dependency issues
-    const ZAI = (await import('z-ai-web-dev-sdk')).default;
-    const zai = await ZAI.create();
-    const allMessages = [
-      ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-      ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-    ];
-    const completion = await zai.chat.completions.create({
-      messages: allMessages,
-    });
-    return completion.choices?.[0]?.message?.content || null;
-  } catch {
-    return null;
-  }
+  // DISABLED: z-ai-web-dev-sdk import crashes the site
+  // Re-enable only via fetch-based API call, never via npm import
+  return null;
 }
 
 // ── Provider Attempt with Telemetry ──
@@ -228,10 +219,8 @@ export async function aiChat(
         : lastMessage;
       return pollinationsText(prompt);
     }, 3, true),
-    // Tier 5: z-ai-web-dev-sdk
-    () => attemptProvider('z-ai', 'default', async () => {
-      return zaiChat(messages, systemPrompt);
-    }, 4, true),
+    // Tier 5: z-ai (disabled — npm import crashes site; use fetch if needed)
+    // Skipped entirely to avoid z-ai-web-dev-sdk import crash
   ];
 
   // Try each provider in sequence
@@ -254,7 +243,7 @@ export async function aiChat(
 export async function aiStructuredChat<T>(
   messages: { role: string; content: string }[],
   systemPrompt?: string,
-  maxTokens = 25000
+  maxTokens = 8000
 ): Promise<T | null> {
   const allMessages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
