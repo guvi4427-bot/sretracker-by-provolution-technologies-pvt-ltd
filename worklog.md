@@ -46,3 +46,30 @@ Stage Summary:
 - Navigator bot still has preloaded local responses (instant, no API)
 - All previous fixes preserved: mobile alignment, chatbot route, estimate-macros/burn
 - Deployment blocked by Vercel free tier limit — user needs to redeploy from dashboard
+---
+Task ID: 1
+Agent: Main Agent
+Task: Switch AI provider from multi-provider (Gemini/OpenAI/OpenRouter) to Pollinations AI with authenticated sk key
+
+Work Log:
+- Read current ai-provider.ts (already using Pollinations without auth, had 4-tier fallback)
+- Read all AI route files (chatbot, estimate-macros, estimate-burn, classify-task, script-review, rate-day, etc.)
+- Confirmed all AI routes import from @/lib/ai-provider — no changes needed in route files
+- Rewrote ai-provider.ts to add POLLINATIONS_API_KEY env var support with Bearer token auth
+- Added Authorization: Bearer header to both pollinationsChat() and pollinationsText() functions
+- Kept 4-tier fallback: auth chat → lite retry → text endpoint → local fallback
+- Kept MAX_TOKENS=4500, increased timeout to 30s
+- Added isApiKeyConfigured() export for health checks
+- Created .env.local with POLLINATIONS_API_KEY=sk_aCfM38aRh4t817IoFQN1OsLo2G0T7LB3
+- Removed old API keys from Vercel PID 1: OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
+- Removed old API keys from Vercel PID 2: OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
+- Added POLLINATIONS_API_KEY to both PIDs (production, preview, development)
+- Added NEXT_PUBLIC_POLLINATIONS_KEY (pk_RqQC0Erm4TOYSJuQ) to both PIDs
+- Committed and pushed to GitHub: feat: switch AI provider to Pollinations AI with authenticated sk key
+- Vercel deployment hit daily limit (100+ deployments) — will auto-deploy from GitHub push
+
+Stage Summary:
+- ai-provider.ts updated with Pollinations sk key auth
+- All Vercel env vars updated on both PIDs
+- Old API keys completely removed
+- Git push successful, auto-deploy pending (rate limited)
