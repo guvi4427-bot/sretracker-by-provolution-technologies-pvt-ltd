@@ -1,11 +1,12 @@
 // ── AI Provider — Multi-Provider Graceful Degradation ──
 //
 // Fallback chain:
-//   Tier 1: Gemini AI (Google generativelanguage API)
-//   Tier 2: OpenAI API (GPT-4o-mini)
-//   Tier 3: Pollinations AI (OpenAI-compatible, authenticated)
-//   Tier 4: Z.ai Production API (GLM-4-Plus, REST — NOT dev SDK)
-//   Tier 5: Local fallback message
+//   Tier 1: Gemini AI (Google generativelanguage API, gemini-2.0-flash)
+//   Tier 2: ChatGPT (OpenAI API, gpt-4o-mini)
+//   Tier 3: OpenRouter (openrouter.ai, gpt-4o-mini via openrouter)
+//   Tier 4: Z.ai Production API (GLM-4-Plus, REST direct — NOT dev SDK)
+//   Tier 5: Pollinations AI (OpenAI-compatible, authenticated with sk key)
+//   Tier 6: Local fallback error message
 //
 // Each tier is tried in sequence. If a tier fails (timeout, error, empty response),
 // the next tier is attempted automatically. This ensures AI features always work
@@ -18,14 +19,16 @@ const FALLBACK_ERROR = 'We are experiencing technical difficulties please try ag
 // ── API Endpoints ──
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const POLLINATIONS_URL = 'https://text.pollinations.ai/openai/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ZAI_URL = 'https://internal-api.z.ai/v1/chat/completions';
+const POLLINATIONS_URL = 'https://text.pollinations.ai/openai/chat/completions';
 
 // ── API Keys (from env vars) ──
 function getGeminiKey(): string | null { return process.env.GEMINI_API_KEY || null; }
 function getOpenAIKey(): string | null { return process.env.OPENAI_API_KEY || null; }
-function getPollinationsKey(): string | null { return process.env.POLLINATIONS_API_KEY || null; }
+function getOpenRouterKey(): string | null { return process.env.OPENROUTER_API_KEY || null; }
 function getZAIKey(): string | null { return process.env.ZAI_API_KEY || null; }
+function getPollinationsKey(): string | null { return process.env.POLLINATIONS_API_KEY || null; }
 
 // ── Timeout Helper ──
 function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
@@ -45,7 +48,7 @@ async function geminiChat(
   maxTokens = MAX_TOKENS,
 ): Promise<string | null> {
   const apiKey = getGeminiKey();
-  if (!apiKey) return null; // Skip if no key configured
+  if (!apiKey) return null;
 
   // Convert OpenAI-style messages to Gemini format
   const contents = messages
@@ -84,23 +87,23 @@ async function geminiChat(
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
   if (content) {
-    console.log(`[AI] OK provider=gemini tokens_est=${content.length}`);
+    console.log(`[AI] OK provider=gemini len=${content.length}`);
   } else {
-    console.error('[AI] Gemini returned empty:', JSON.stringify(data).slice(0, 200));
+    console.error('[AI] Gemini empty:', JSON.stringify(data).slice(0, 200));
   }
 
   return content;
 }
 
 // ═══════════════════════════════════════════════════════
-// Tier 2: OpenAI API (GPT-4o-mini)
+// Tier 2: ChatGPT (OpenAI API, gpt-4o-mini)
 // ═══════════════════════════════════════════════════════
 async function openaiChat(
   messages: { role: string; content: string }[],
   maxTokens = MAX_TOKENS,
 ): Promise<string | null> {
   const apiKey = getOpenAIKey();
-  if (!apiKey) return null; // Skip if no key configured
+  if (!apiKey) return null;
 
   const res = await withTimeout(
     fetch(OPENAI_URL, {
@@ -127,16 +130,105 @@ async function openaiChat(
   const content = data?.choices?.[0]?.message?.content || null;
 
   if (content) {
-    console.log(`[AI] OK provider=openai model=gpt-4o-mini tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+    console.log(`[AI] OK provider=openai model=gpt-4o-mini in=${data?.usage?.prompt_tokens || '?'} out=${data?.usage?.completion_tokens || '?'}`);
   } else {
-    console.error('[AI] OpenAI returned empty:', JSON.stringify(data).slice(0, 200));
+    console.error('[AI] OpenAI empty:', JSON.stringify(data).slice(0, 200));
   }
 
   return content;
 }
 
 // ═══════════════════════════════════════════════════════
-// Tier 3: Pollinations AI (OpenAI-compatible, authenticated)
+// Tier 3: OpenRouter (openrouter.ai, gpt-4o-mini)
+// ═══════════════════════════════════════════════════════
+async function openrouterChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string | null> {
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) return null;
+
+  const res = await withTimeout(
+    fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://sre-growth-platform.vercel.app',
+        'X-Title': 'SRE Growth Platform',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    }),
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || null;
+
+  if (content) {
+    console.log(`[AI] OK provider=openrouter model=gpt-4o-mini in=${data?.usage?.prompt_tokens || '?'} out=${data?.usage?.completion_tokens || '?'}`);
+  } else {
+    console.error('[AI] OpenRouter empty:', JSON.stringify(data).slice(0, 200));
+  }
+
+  return content;
+}
+
+// ═══════════════════════════════════════════════════════
+// Tier 4: Z.ai Production API (GLM-4-Plus, REST direct)
+// Uses production SDK API key — NOT the dev SDK (z-ai-web-dev-sdk)
+// ═══════════════════════════════════════════════════════
+async function zaiChat(
+  messages: { role: string; content: string }[],
+  maxTokens = MAX_TOKENS,
+): Promise<string | null> {
+  const apiKey = getZAIKey();
+  if (!apiKey) return null;
+
+  const res = await withTimeout(
+    fetch(ZAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'glm-4-plus',
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    }),
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Z.ai ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || null;
+
+  if (content) {
+    console.log(`[AI] OK provider=zai model=glm-4-plus in=${data?.usage?.prompt_tokens || '?'} out=${data?.usage?.completion_tokens || '?'}`);
+  } else {
+    console.error('[AI] Z.ai empty:', JSON.stringify(data).slice(0, 200));
+  }
+
+  return content;
+}
+
+// ═══════════════════════════════════════════════════════
+// Tier 5: Pollinations AI (OpenAI-compatible, authenticated)
 // ═══════════════════════════════════════════════════════
 async function pollinationsChat(
   messages: { role: string; content: string }[],
@@ -174,53 +266,9 @@ async function pollinationsChat(
   const content = data?.choices?.[0]?.message?.content || null;
 
   if (content) {
-    console.log(`[AI] OK provider=pollinations tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
+    console.log(`[AI] OK provider=pollinations in=${data?.usage?.prompt_tokens || '?'} out=${data?.usage?.completion_tokens || '?'}`);
   } else {
-    console.error('[AI] Pollinations returned empty:', JSON.stringify(data).slice(0, 200));
-  }
-
-  return content;
-}
-
-// ═══════════════════════════════════════════════════════
-// Tier 4: Z.ai Production API (GLM-4-Plus, REST direct)
-// Uses production SDK API key — NOT the dev SDK (z-ai-web-dev-sdk)
-// ═══════════════════════════════════════════════════════
-async function zaiChat(
-  messages: { role: string; content: string }[],
-  maxTokens = MAX_TOKENS,
-): Promise<string | null> {
-  const apiKey = getZAIKey();
-  if (!apiKey) return null; // Skip if no key configured
-
-  const res = await withTimeout(
-    fetch(ZAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'glm-4-plus',
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.7,
-      }),
-    }),
-  );
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Z.ai ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content || null;
-
-  if (content) {
-    console.log(`[AI] OK provider=zai model=glm-4-plus tokens_in=${data?.usage?.prompt_tokens || '?'} tokens_out=${data?.usage?.completion_tokens || '?'}`);
-  } else {
-    console.error('[AI] Z.ai returned empty:', JSON.stringify(data).slice(0, 200));
+    console.error('[AI] Pollinations empty:', JSON.stringify(data).slice(0, 200));
   }
 
   return content;
@@ -240,8 +288,9 @@ function getProviderChain(): ProviderTier[] {
   return [
     { name: 'gemini', fn: geminiChat },
     { name: 'openai', fn: openaiChat },
-    { name: 'pollinations', fn: pollinationsChat },
+    { name: 'openrouter', fn: openrouterChat },
     { name: 'zai', fn: zaiChat },
+    { name: 'pollinations', fn: pollinationsChat },
   ];
 }
 
@@ -462,7 +511,6 @@ export function getNavigatorResponse(userMessage: string): string | null {
     if (pattern.test(msg)) return response;
   }
 
-  // No match — return null to let the AI API handle it
   return null;
 }
 
@@ -487,7 +535,6 @@ export async function aiQuickCall(
       if (result) return result;
     } catch (e: any) {
       console.error(`[AI] aiQuickCall ${provider.name} failed:`, e.message?.slice(0, 100));
-      // Continue to next provider
     }
   }
 
@@ -498,5 +545,5 @@ export async function aiQuickCall(
 // Public: Check if any API key is configured
 // ═══════════════════════════════════════════════════════
 export function isApiKeyConfigured(): boolean {
-  return !!(getGeminiKey() || getOpenAIKey() || getPollinationsKey() || getZAIKey());
+  return !!(getGeminiKey() || getOpenAIKey() || getOpenRouterKey() || getZAIKey() || getPollinationsKey());
 }
