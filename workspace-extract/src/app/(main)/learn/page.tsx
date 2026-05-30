@@ -485,9 +485,9 @@ function LearnPageContent() {
 
       {/* Share to Group Dialog */}
       <Dialog open={shareToGroupOpen} onOpenChange={setShareToGroupOpen}>
-        <DialogContent className="bg-background border-border">
+        <DialogContent className="sm:max-w-md bg-background border-border p-4">
           <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><Users size={18} className="text-emerald-400" />Share to Group</DialogTitle></DialogHeader>
-          <div className="mt-4">
+          <div className="mt-2">
             {shareTopicData && (
               <p className="text-sm text-muted-foreground mb-3">Share <span className="text-foreground font-medium">"{shareTopicData.name}"</span> to a group</p>
             )}
@@ -513,7 +513,7 @@ function LearnPageContent() {
 
       {/* Share to DM Dialog */}
       <Dialog open={shareToDMOpen} onOpenChange={setShareToDMOpen}>
-        <DialogContent className="bg-background border-border">
+        <DialogContent className="sm:max-w-md bg-background border-border p-4">
           <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><MessageCircle size={18} className="text-blue-400" />Share to DM</DialogTitle></DialogHeader>
           <div className="mt-4">
             {shareTopicData && (

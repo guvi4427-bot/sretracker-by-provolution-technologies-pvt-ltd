@@ -359,7 +359,7 @@ export default function BlogDetailClient() {
 
       {/* Share Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] p-4 sm:p-6 overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-lg p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Share2 size={18} /> Share This Blog</DialogTitle>
           </DialogHeader>
@@ -380,15 +380,15 @@ export default function BlogDetailClient() {
               <Button variant="outline" onClick={() => { window.open(shareUrl, '_blank'); setShareDialogOpen(false); }} className="w-full">
                 <ExternalLink size={16} className="mr-2" /> Open in New Tab
               </Button>
-              {/* Social share buttons — responsive grid for mobile */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <Button variant="outline" size="sm" className="text-xs h-9 px-2" onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(blog.title)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}>
-                  𝕏 Post
+              {/* Social share buttons — compact grid for mobile */}
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                <Button variant="outline" size="sm" className="text-[10px] sm:text-xs h-8 sm:h-9 px-1 sm:px-2 truncate" onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(blog.title)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}>
+                  X
                 </Button>
-                <Button variant="outline" size="sm" className="text-xs h-9 px-2" onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank')}>
+                <Button variant="outline" size="sm" className="text-[10px] sm:text-xs h-8 sm:h-9 px-1 sm:px-2 truncate" onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank')}>
                   LinkedIn
                 </Button>
-                <Button variant="outline" size="sm" className="text-xs h-9 px-2 col-span-2 sm:col-span-1" onClick={() => window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(blog.title)}`, '_blank')}>
+                <Button variant="outline" size="sm" className="text-[10px] sm:text-xs h-8 sm:h-9 px-1 sm:px-2 truncate" onClick={() => window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(blog.title)}`, '_blank')}>
                   Reddit
                 </Button>
               </div>

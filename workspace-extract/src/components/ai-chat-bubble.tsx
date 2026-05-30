@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '@/lib/i18n';
 import { AIMessage } from '@/components/ai-message';
 
-type BotType = 'general' | 'learning' | 'fitness' | 'content' | 'time';
+type BotType = 'general' | 'learning' | 'fitness' | 'content' | 'time' | 'navigation';
 
 interface ChatMessage {
   id: string;
