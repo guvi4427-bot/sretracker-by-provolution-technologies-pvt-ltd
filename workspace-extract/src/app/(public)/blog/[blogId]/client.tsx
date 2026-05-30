@@ -368,13 +368,18 @@ export default function BlogDetailClient() {
               <p className="text-xs text-muted-foreground mb-1">by {blog.user.name}</p>
               <p className="text-sm text-foreground line-clamp-2 break-words">{blog.title}</p>
             </div>
-            <div className="flex items-center gap-2 w-full">
-              <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0 overflow-hidden">
-                <p className="truncate break-all">{shareUrl}</p>
+            {/* Share URL — copy button embedded inside to prevent mobile overflow */}
+            <div className="relative w-full">
+              <div className="w-full bg-accent/30 rounded-md pr-10 pl-3 py-2 text-xs text-muted-foreground border border-border/50 overflow-hidden">
+                <p className="truncate">{shareUrl}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={copyLink} className="shrink-0" title="Copy link">
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-              </Button>
+              <button
+                onClick={copyLink}
+                title="Copy link"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent/60 transition-colors text-muted-foreground hover:text-foreground"
+              >
+                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+              </button>
             </div>
             <div className="flex flex-col gap-2">
               <Button variant="outline" onClick={() => { window.open(shareUrl, '_blank'); setShareDialogOpen(false); }} className="w-full">

@@ -258,21 +258,19 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
             </p>
           </div>
 
-          {/* Share URL — always shows copy button */}
-          <div className="flex items-center gap-2 w-full">
-            <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0 overflow-hidden">
-              <p className="truncate break-all">{shareUrl || 'Generating link...'}</p>
+          {/* Share URL — copy button embedded inside to prevent mobile overflow */}
+          <div className="relative w-full">
+            <div className="w-full bg-accent/30 rounded-md pr-10 pl-3 py-2 text-xs text-muted-foreground border border-border/50 overflow-hidden">
+              <p className="truncate">{shareUrl || 'Generating link...'}</p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
+            <button
               onClick={copyLink}
-              className="shrink-0"
               disabled={!shareUrl}
               title="Copy link"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent/60 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40"
             >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </Button>
+              {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+            </button>
           </div>
 
           {/* External Share Buttons — compact grid for mobile */}
