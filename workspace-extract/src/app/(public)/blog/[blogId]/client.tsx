@@ -359,20 +359,20 @@ export default function BlogDetailClient() {
 
       {/* Share Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Share2 size={18} /> Share This Blog</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="bg-accent/50 rounded-lg p-3">
+            <div className="bg-accent/50 rounded-lg p-3 overflow-hidden">
               <p className="text-xs text-muted-foreground mb-1">by {blog.user.name}</p>
-              <p className="text-sm text-foreground line-clamp-2">{blog.title}</p>
+              <p className="text-sm text-foreground line-clamp-2 break-words">{blog.title}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full">
               <div className="flex-1 bg-accent/30 rounded-md px-3 py-2 text-xs text-muted-foreground border border-border/50 min-w-0 overflow-hidden">
                 <p className="truncate break-all">{shareUrl}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={copyLink} className="shrink-0">
+              <Button size="sm" variant="outline" onClick={copyLink} className="shrink-0" title="Copy link">
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </Button>
             </div>
@@ -380,15 +380,15 @@ export default function BlogDetailClient() {
               <Button variant="outline" onClick={() => { window.open(shareUrl, '_blank'); setShareDialogOpen(false); }} className="w-full">
                 <ExternalLink size={16} className="mr-2" /> Open in New Tab
               </Button>
-              {/* Social share buttons */}
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(blog.title)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}>
+              {/* Social share buttons — grid prevents overflow */}
+              <div className="grid grid-cols-3 gap-2">
+                <Button variant="outline" size="sm" className="text-xs h-8 px-1" onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(blog.title)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}>
                   𝕏 Post
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank')}>
+                <Button variant="outline" size="sm" className="text-xs h-8 px-1" onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank')}>
                   LinkedIn
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(blog.title)}`, '_blank')}>
+                <Button variant="outline" size="sm" className="text-xs h-8 px-1" onClick={() => window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(blog.title)}`, '_blank')}>
                   Reddit
                 </Button>
               </div>

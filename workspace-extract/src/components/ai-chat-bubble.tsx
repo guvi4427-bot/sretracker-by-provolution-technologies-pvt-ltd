@@ -8,6 +8,7 @@ import { Bot, X, Send, Loader2, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '@/lib/i18n';
+import { AIMessage } from '@/components/ai-message';
 
 type BotType = 'general' | 'learning' | 'fitness' | 'content' | 'time';
 
@@ -209,7 +210,11 @@ export function AIChatBubble({
                               : 'bg-white/10 text-white/80 rounded-bl-md'
                           )}
                         >
-                          {msg.content}
+                          {msg.role === 'assistant' ? (
+                            <AIMessage content={msg.content} />
+                          ) : (
+                            msg.content
+                          )}
                         </div>
                       </motion.div>
                     ))

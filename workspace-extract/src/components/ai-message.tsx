@@ -28,14 +28,48 @@ const ROUTE_LABELS: Record<string, string> = {
   '/friends': 'Friends',
   '/onboarding': 'Onboarding',
   '/ai-hub': 'AI Hub',
+  '/blog': 'Blog',
 };
+
+// Reverse map: friendly name keywords → route path
+const NAME_TO_ROUTE: [RegExp, string][] = [
+  [/dashboard|home page|overview|main page/i, '/home'],
+  [/learning|learn section|study|learning tracker/i, '/learn'],
+  [/fitness|workout|exercise|gym|nutrition|fitness tracker/i, '/fitness'],
+  [/content|content studio|script|series|publishing/i, '/content'],
+  [/task|tasks|todo|focus|time manage|productivity|pomodoro/i, '/time'],
+  [/feed|social|posts|social feed/i, '/feed'],
+  [/discover|explore|find user/i, '/discover'],
+  [/leaderboard|ranking|xp rank|rank/i, '/leaderboard'],
+  [/achievement|badge|trophy/i, '/achievements'],
+  [/analytic|chart|stat|progress data|data dashboard/i, '/analytics'],
+  [/profile|account|my page/i, '/profile'],
+  [/setting|preference|config/i, '/settings'],
+  [/notification|alert|bell/i, '/notifications'],
+  [/message|dm|chat|direct message|inbox/i, '/messages'],
+  [/friend|friend list/i, '/friends'],
+  [/onboard|getting started|setup|phase/i, '/onboarding'],
+  [/ai.?hub|ai assistant|ai center|ai chat/i, '/ai-hub'],
+  [/blog|article|read|write article/i, '/blog'],
+];
 
 // Detect internal route references in AI message text
 function extractRoutes(text: string): string[] {
-  const routePattern = /\/(?:home|learn|fitness|content|time|feed|discover|leaderboard|achievements|analytics|profile|settings|notifications|messages|friends|onboarding|ai-hub)\b/g;
-  const matches = text.match(routePattern) || [];
-  // Deduplicate
-  return [...new Set(matches)];
+  const found = new Set<string>();
+
+  // 1. Match explicit route paths like /fitness, /learn
+  const routePattern = /\/(?:home|learn|fitness|content|time|feed|discover|leaderboard|achievements|analytics|profile|settings|notifications|messages|friends|onboarding|ai-hub|blog)\b/g;
+  const pathMatches = text.match(routePattern) || [];
+  pathMatches.forEach(r => found.add(r));
+
+  // 2. Match friendly name references (e.g., "Fitness section", "Learning tracker")
+  for (const [pattern, route] of NAME_TO_ROUTE) {
+    if (pattern.test(text)) {
+      found.add(route);
+    }
+  }
+
+  return [...found];
 }
 
 function NavigateButton({ route }: { route: string }) {
