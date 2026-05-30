@@ -217,7 +217,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { handleClose(); } }}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] p-4 sm:p-6 overflow-y-auto overflow-x-hidden">
         {/* Scrollable inner container to prevent content clipping */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -275,12 +275,12 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
             </Button>
           </div>
 
-          {/* External Share Buttons — grid layout prevents overflow */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* External Share Buttons — responsive grid prevents overflow on mobile */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 px-1"
+              className="text-xs h-9 px-2"
               onClick={() => {
                 window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(safeShareData.preview?.slice(0, 100) || 'Check this out')}`, '_blank');
               }}
@@ -292,7 +292,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 px-1"
+              className="text-xs h-9 px-2"
               onClick={() => {
                 window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(safeShareData.preview?.slice(0, 100) || 'Check this out')}`, '_blank');
               }}
@@ -304,7 +304,7 @@ export default function ShareToChatDialog({ isOpen, onClose, shareData }: ShareT
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 px-1"
+              className="text-xs h-9 px-2"
               onClick={() => {
                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent((safeShareData.preview?.slice(0, 100) || 'Check this out') + ' ' + shareUrl)}`, '_blank');
               }}
